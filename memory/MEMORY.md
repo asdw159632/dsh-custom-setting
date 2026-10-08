@@ -22,9 +22,33 @@
     `git config http.sslBackend openssl`。
   * 若在别的克隆中遇到同样的 TLS 报错，改用
     `git -c http.sslBackend=openssl <命令>`。
-* **凭据**：GitHub 凭据已存放在 Windows 凭据管理器
-  （`cmdkey` 目标 `git:https://github.com`，用户 `asdw159632`），
-  通过系统级 `credential.helper=manager` 自动取用。
+* **凭据（重要，勿踩坑）**：
+  * GitHub 凭据**确实存在**，存放在 Windows 凭据管理器
+    （`cmdkey` 目标 `git:https://github.com`，用户 `asdw159632`，
+    值为一个 40 位 PAT）。
+  * **但在 DSH 沙箱下 `credential.helper` 完全不可用。** 原因：git 是**通过
+    MSYS `sh`/`bash`** 去执行 credential helper 与 askpass 的，而沙箱禁止
+    MSYS 创建 signal pipe，于是必然报：
+    ```
+    sh.exe: *** fatal error - couldn't create signal pipe, Win32 error 5
+    error: failed to execute prompt script (exit code 66)
+    fatal: could not read Username for 'https://github.com'
+    ```
+    系统级 `credential.helper=manager` 也因此失效（`manager` 还不一定在 PATH 上）。
+  * **可行做法：绕开 helper，用 `http.extraHeader` 直接携带 Basic 认证头。**
+    已封装为脚本，推送一律走它：
+
+    ```powershell
+    pwsh -File scripts/push.ps1
+    ```
+
+    脚本内部：`git-credential-manager get` 取到 PAT（直接调用可正常工作，
+    只有经过 git 的 helper 机制才会挂）→ 拼 `Authorization: Basic <base64(user:pat)>`
+    → `git -c http.extraHeader=... push`。
+  * 手工应急写法（token 从别处取）：
+    ```powershell
+    git -c "http.extraHeader=Authorization: Basic <base64(user:token)>" push origin main
+    ```
 * 本工作区**不是**裸仓库 + 工作仓库的模式，而是直接以工作区本身作为仓库，
   远程指向上面的 GitHub 仓库。
 
@@ -41,6 +65,7 @@
   ├── mods/                # 各个 DSH 定制需求，一个需求一个子目录
   │   └── <需求名>/        # 内含该需求的源码、说明、状态
   ├── logs/                # 工作日志（每个阶段一篇）
+  ├── scripts/push.ps1     # 推送脚本（沙箱下唯一可行的推送方式）
   └── tmp/                 # 临时脚本，不提交
   ```
 
@@ -63,3 +88,4 @@
 | 日期 | 内容 |
 | --- | --- |
 | 2026-10-08 | 建立本文件；记录远程同步目标与多文件夹组织约定。 |
+| 2026-10-08 | 修正凭据记录：`credential.helper` 在沙箱下不可用，推送改用 `scripts/push.ps1`（`http.extraHeader`）。 |
