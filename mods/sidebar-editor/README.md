@@ -96,6 +96,58 @@ peer 逐条核对结论（对着 `tmp\host-official-packages.txt`）：
 * desktop profile 的 `cordis.patch.yml` 里**没有**任何 `better-sidebar` 手工挂载行
   （已读全文确认）→ 不会双挂载出两个侧栏。
 
+### 2.5 市场（dshmarket）为什么弹「这是终端插件」——文案启发式，对 0.24.1 不成立
+
+用户装之前收到提醒：「它是终端插件，可能让 web 版和客户端跑不起来」。**已定位到确切出处与判定逻辑。**
+
+**出处**：`dshmarket`（创意工坊）的**安装确认弹窗** —— `MarketSection.tsx:7138`
+在 `looksTerminal(confirming, lang)` 为真时渲染该警告块，文案在
+`dshmarket/src/client/locales.ts:135-138`（打包后在 `client/client.js:333-336`）：
+
+| 键 | 文案 |
+| --- | --- |
+| `terminalCautionTitle` | 可能不适用于网页版 |
+| `terminalCautionBody` | 这是终端插件，网页版里可能用不了。 |
+| `terminalCautionStartup` | 也可能让 DeepSeek Harness 起不来。 |
+| `terminalCautionLink` | 先看使用说明 ↗ |
+
+**判定逻辑**：`market-data.ts:382` 的 `looksTerminal()` 是**纯文案正则**，
+把「插件名 + 市场描述」里出现 `tui|cli|tty|terminal|终端|命令行` 当作"终端插件"证据，
+只在匹配前剔除「无需/不需要 … terminal」这类否定从句。它**不读依赖、不看原生模块**。
+
+**为什么命中**：市场数据源（`awesome-dsh-plugin.com/plugins.json`，dshmarket 的目录源）
+给它的描述是：
+
+> Full sidebar workbench with file rendering and editing, **terminal**, Git, and subagents;
+> third-party plugins can register new tabs.
+
+那个 terminal 指的是**它侧栏里的终端 tab —— 而该 tab 自 v0.19 起由 DSH 官方
+`dsh-client-ui-sidebar-terminal` 提供**（插件自己不再实现终端）。
+
+**对 0.24.1 是否为真：否。**
+
+* **无原生依赖**：0.24.1 的依赖清单里**没有 `node-pty`**（只有 CodeMirror 系、mermaid、
+  dompurify、ws、yaml、clsx、rxjs、react-icons、`@deepseek-ai/schemastery`）。
+  对比：老版 `0.18.0`（web profile 现存）的依赖里**有 `node-pty: ^1.1.0`** —— 提醒描述的是**那个年代**。
+* 上游 README 两处明写：安装「depends on no package that needs a build script
+  (the terminal and `node-pty` went back to DSH wholesale)」、「carries no native dependencies」。
+  → 没有原生编译、没有构建脚本，**"装完起不来"的因果链不存在**。
+* **市场自己的兼容性数据也没拦它**：`~/.dsh/profiles/desktop/.dsh-market/discovery-compatibility-v1.json`
+  里 `dsh-better-sidebar` 的缓存事实是 version **0.24.1**、`enginesDsh: null`（无宿主版本门），
+  peers 全为 `^0.2.0-rc.1` —— 与本机 0.2.0-rc.2 相符（§2.3 已逐条核对宿主里都在）。
+  即**只有文案启发式命中，兼容性判定通过**。
+
+**那条提醒何时是真的**：自带 xterm + `node-pty` 的终端类插件需要 pnpm 跑构建脚本，
+Windows 上还常撞"文件被运行中的宿主占用"；而 DSH 启动是**全有全无**——一个插件加载失败
+整个进程退出（dshmarket 因此配了脱离终端的恢复界面与「调整插件」）。0.24.1 不属于这一类。
+
+**顺带一条实用提醒**：`~/.dsh/profiles/desktop/.dsh-market/log.ndjson` 里有
+`install-blocked: refused while agents are running`（2026-10-08）——**有会话在跑时市场会拒绝安装**。
+若你在市场里被这条挡下：改用官方「**插件**」页安装（不受该限制），或先结束会话再装。
+
+**真正需要防的仍然只有两件事**（与提醒无关）：装完**完全重启客户端**（host 半区）；
+以及 v0.23.0 起其 fs 路由取消工作区包含检查的安全取舍。
+
 ---
 
 ## 3. 方案：装 `dsh-better-sidebar@0.24.1`

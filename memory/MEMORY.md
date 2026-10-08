@@ -171,6 +171,18 @@
   * 已知小缺口：`dsh-remote-web-ui` 的 `wsPaths` 白名单没有 better-sidebar 0.24.1 的
     `/sidebar/ws/fs-watch` → 仅**手机远程访问**时文件树目录自动刷新可能不工作，本地无影响。
   * 唯一真冲突：**同一插件装两遍**（两个通道）→ `duplicate loader entry id` / 重复路由。只装一次。
+* **dshmarket「这是终端插件」提醒 = 文案启发式，不是兼容性判定**（2026-10-08 实测）：
+  * 文案在 `dshmarket/src/client/locales.ts:135-138`（`terminalCautionTitle/Body/Startup/Link`：
+    「可能不适用于网页版 / 这是终端插件，网页版里可能用不了。/ 也可能让 DeepSeek Harness 起不来。」），
+    由安装确认弹窗 `MarketSection.tsx:7138` 在 `looksTerminal()` 为真时渲染。
+  * `looksTerminal()`（`market-data.ts:382`）只对**插件名 + 市场描述**跑正则
+    `tui|cli|tty|terminal|终端|命令行`；命中原因 = 目录源描述里有 "terminal"
+    （指它侧栏那个**由 DSH 官方 ui-sidebar-terminal 提供**的 tab）。
+  * 对 0.24.1 **不成立**：无 `node-pty`、无原生依赖、无构建脚本（0.18.0 才有 node-pty）；
+    市场自己的兼容缓存（`.dsh-market\discovery-compatibility-v1.json`）也判 0.24.1 可用
+    （`enginesDsh: null`，peers 全 `^0.2.0-rc.1`）。
+  * 该提醒为真的场景 = 自带 xterm+node-pty 的终端插件（要构建脚本 + DSH 启动全有全无）。
+  * 另注：dshmarket 有会话在跑时**拒绝安装**（`log.ndjson` 的 `install-blocked`）——被挡就走官方「插件」页。
 * **可复用的只读工具**（`tmp/`，不进 git）：
   * `tmp\list-host-official-packages.mjs` → 列 asar 内官方包名与版本
   * `tmp\dump-asar.mjs <asar 内路径前缀>` → 把官方包源码/README 导出到 `tmp\asar-dump\`
