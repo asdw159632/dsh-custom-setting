@@ -14,7 +14,7 @@
   * 该仓库是**本工作区所有工作的同步目标**。工作区的每一次阶段性提交都要推送到这里。
 * **提交 / 推送约定**：完成阶段性工作后
   1. `git add -A && git commit -m "<说明>"`
-  2. `git push origin main`
+  2. `scripts\push.cmd` ← **不要直接用 `git push`**，原因见下面的「凭据」
 * **TLS 注意事项（本机环境）**：
   * 在 DSH 沙箱环境下，git 默认的 `schannel` TLS 后端会报
     `schannel: AcquireCredentialsHandle failed: SEC_E_NO_CREDENTIALS (0x8009030e)`。
