@@ -61,11 +61,38 @@ peer 逐条核对结论（对着 `tmp\host-official-packages.txt`）：
 可选 peer `dsh-client-ui-sidebar-right` 也在（`0.2.0-rc.2`）。
 唯一残留未满足的是可选集成 `@huanlin/dsh-plugin-better-locale`（上游未适配 0.2，非本品依赖面）。
 
-### 2.4 无冲突
+### 2.4 与已装的 `dsh-web-all@0.4.5` 是否冲突（2026-10-08 实测：不冲突）
 
-* `dsh-web-all@0.4.5`（desktop profile 已装的那套：任务看板 / SSH / 用量 …）的
-  `cordis.patch.yml` **没有** `better-sidebar` 行，dependencies 里也没有它 ——
-  不会触发 better-sidebar 的「聚合包双挂载」退让逻辑，无需处理挂载顺序。
+用户明确问过这一条，逐项核对如下（全部只读查证，未改任何文件）：
+
+| 冲突面 | 实测结果 | 依据 |
+| --- | --- | --- |
+| **双挂载**（同一包挂两次 → `duplicate prefix route "/sidebar/api"`） | ❌ 不会发生：`dsh-web-all@0.4.5` 的 `cordis.patch.yml` **没有** `better-sidebar` 行，`dependencies` 里也没有该包；全家族搜 `better-sidebar` 只命中"商店条目描述 / 插件管理器注释 / remote-web-ui 注释"，**没有任何挂载行** | 整树 grep |
+| **右侧栏 tab kind 抢占** | ❌ 不会：全家族对右栏只做**只读探测** —— `ctx.get('sidebarRightTabs').get('browser')` 判断官方 browser tab 是否存在，再 `ctx.sidebarRight.openTab('browser', {url})`（创意工坊外链）。**没有任何 `sidebarRightTabs.register`** | grep `sidebarRightTabs.register|openTab(` |
+| **host 路由前缀** | ❌ 不会：better-sidebar 占 `/sidebar/*`；家族占 `/api/dsh-*` / `/api/plugin-manager` / `/api/dsh-ssh` / `/git` / `/pet` / `/remote`。remote-web-ui 反而**主动把 `/sidebar/*` 列入转发白名单**（成对设备通道） | `remote-channel-rules.ts` §REMOTE_CHANNEL_RULES |
+| **UI 区域** | ❌ 不重叠：家族占**左侧栏**面板行（任务看板 / SSH / 技能中心 / 皮肤中心）+ 底部席位（更新 / 远程 / 用量卡）；better-sidebar 占**右侧栏** tab + 自绘底部工作台 | 各自 README + 注入面 |
+| **设置分区** | ❌ 不冲突：家族一个一级分区（web-ui-settings），better-sidebar 自己的「侧边卡片」分区与挂载行 config 并存 | 各自 README |
+
+**两条需要知情的细节（不是冲突）：**
+
+1. **家族插件管理器里的 `bundle-guard` 是冲着另一套聚合包写的。**
+   `@linxin666/dsh-client-ui-plugin-manager@0.4.5` 里有一段守卫，注释原文就是
+   「the family aggregate mounts dsh-better-sidebar as the insert row
+   `{ id: 'better-sidebar', name: 'dsh-better-sidebar' }` … → duplicate prefix route `/sidebar/api`」。
+   它处理的是 **`@linxin666/dsh-web-ui-all`（web profile 那套，0.3.x）**：
+   那一套确实把 better-sidebar 当行挂载，同时官方 CLI 又把它追加进 `dsh.profile.bundles`，
+   于是重复挂载。**desktop 的 `dsh-web-all@0.4.5` 不挂它**，所以这段守卫在本机不会触发，
+   也不存在挂载顺序问题。
+2. **远程访问通道的白名单漏了新 ws 路径。** `dsh-remote-web-ui` 的
+   `wsPaths` 只列 `/api/remote.mux`、`/sidebar/ws/terminal`、`/sidebar/ws/agent-terminals`、
+   `/sidebar/ws/agent-opens`、`/api/dsh-ssh/terminal` —— **没有 better-sidebar 0.24.1 的
+   `/sidebar/ws/fs-watch`**。影响面仅限**手机扫码远程访问**时文件树的目录实时刷新
+   （fetch 类 `/sidebar/*` 由 `sidebarPrefix` 整体覆盖，不受影响；**本地桌面零影响**）。
+
+**唯一真会"冲突"的操作**：把同一插件装两遍（例如官方插件页装过、又从创意工坊再装一次）
+→ 同一 loader entry id → `duplicate loader entry id` 或 `duplicate prefix route "/sidebar/api"`。
+**只走一个通道装一次**即可；真出现了就在插件页停用其中一个。
+
 * desktop profile 的 `cordis.patch.yml` 里**没有**任何 `better-sidebar` 手工挂载行
   （已读全文确认）→ 不会双挂载出两个侧栏。
 

@@ -163,6 +163,14 @@
 * 装完 **必须重启客户端**（该插件有 host 半区 `/sidebar/api/*` 路由）。
 * ⚠️ 该插件 v0.23.0 起 fs 路由**取消了工作区包含检查**（可读写宿主用户能访问的任意路径）
   —— 已知安全取舍，知情后再装。
+* **与 `dsh-web-all@0.4.5` 不冲突（2026-10-08 实测）**：家族无任何 better-sidebar 挂载行
+  （无双挂载）；对右栏只做只读探测 `sidebarRightTabs.get('browser')` + `openTab`（无注册）；
+  路由前缀不重叠（better-sidebar 占 `/sidebar/*`）。
+  * 家族插件管理器里的 `bundle-guard`（注释点名 `duplicate prefix route "/sidebar/api"`）是给
+    **web profile 的 `@linxin666/dsh-web-ui-all`** 写的——那一套才挂 better-sidebar，desktop 这套不挂。
+  * 已知小缺口：`dsh-remote-web-ui` 的 `wsPaths` 白名单没有 better-sidebar 0.24.1 的
+    `/sidebar/ws/fs-watch` → 仅**手机远程访问**时文件树目录自动刷新可能不工作，本地无影响。
+  * 唯一真冲突：**同一插件装两遍**（两个通道）→ `duplicate loader entry id` / 重复路由。只装一次。
 * **可复用的只读工具**（`tmp/`，不进 git）：
   * `tmp\list-host-official-packages.mjs` → 列 asar 内官方包名与版本
   * `tmp\dump-asar.mjs <asar 内路径前缀>` → 把官方包源码/README 导出到 `tmp\asar-dump\`
@@ -183,3 +191,4 @@
 | 2026-10-08 | 该会话 pwsh/grep/read 子进程通道故障：`subprocess-local: Windows Job runner exited with exit code 1 before proving its managed range empty`。若再次遇到，视为环境故障，不要反复重试同类命令。 |
 | 2026-10-08 | 客户端重装到 `D:\software\DSH`（旧 `D:\software\DeepSeek Harness` 已删），asar 恢复为干净的 121348951 字节。**补丁已成功写回**：头部 16 字节与其余全部字节保持一致，仅目标条目 200124→204716（+4592）。工具路径改为读 `tmp\paths.json`。 |
 | 2026-10-08 | 新增 §6「右侧栏编辑器选型」：查明宿主自带官方右侧栏（files/documentpreview/terminal/browser），但官方预览只读 + `dsh-api-workspace-files` 无写方法；选型 = 装 `dsh-better-sidebar@0.24.1`（走侧栏「插件」页安装），需求目录 `mods/sidebar-editor/`，日志 `logs/2026-10-08-sidebar-editor.md`。 |
+| 2026-10-08 | 补充 §6：实测 `dsh-better-sidebar` 与 `dsh-web-all@0.4.5` **不冲突**（无双挂载 / 无右栏注册 / 无前缀重叠）；家族 `bundle-guard` 针对的是 web profile 的 `dsh-web-ui-all` 那一套；已知小缺口 = 远程访问白名单缺 `/sidebar/ws/fs-watch`。 |
