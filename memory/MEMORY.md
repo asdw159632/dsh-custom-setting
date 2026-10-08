@@ -138,6 +138,36 @@
   integrity；写后做独立语义核对）。体检：`tmp\asar-independent-check.mjs`。
   事故全过程见 `mods\active-workspaces\EMERGENCY-RESTORE.md` 与 `PATCH-STATUS.md`。
 
+## 6. 右侧栏「编辑器」选型结论（重要，别再重复调研）
+
+> 记录日期：2026-10-08。详见 `mods/sidebar-editor/README.md`。
+
+* **当前 GUI = desktop profile**，装的是 `@linxin666/dsh-web-all@0.4.5` 那套；
+  它对侧栏只做「加行 / 加席位 / 套皮肤」，**没有编辑能力**。
+* **宿主自带官方右侧栏**（都是 0.2.0-rc.2）：
+  `dsh-client-ui-sidebar-right` / `-sidebar-files`（文件树）/ `-sidebar-documentpreview`
+  （Office/PDF/图片/表格/文本预览）/ `-sidebar-terminal` / `-sidebar-browser`。
+* **官方预览是只读，且是设计**：`sidebar-documentpreview` 文档明写「预览而非编辑」；
+  宿主 `dsh-api-workspace-files` 只有 `read`/`readBytes`/`stat`/`list`/`changes`，
+  **没有写方法**（写入只在 host 侧 `ctx.fs`）。所以官方路线永远拿不到编辑器。
+* **补编辑器的唯一现成方案：`dsh-better-sidebar@0.24.1`**（peer `^0.2.0-rc.1`，
+  14 条 peer 对宿主全部满足）。它 v0.19.0 起接原生右侧栏、**接管内置「文件」页**，
+  提供可编辑 CodeMirror（`Ctrl+S` / 脏标记 / mtime 冲突检测）。
+  * **版本必须按宿主线选**：0.2.0-rc.x 宿主 → `0.24.1`；0.1.7 线 → `0.22.1`；
+    0.1.2 线 → `0.18.x`（= web profile 里现存那个，**在 desktop 上会被启动预检整行禁用**）。
+  * `@linxin666/dsh-client-ui-aionui-panel` 是 0.1.x 线（依赖 0.2 宿主没有的
+    `dsh-client-runtime`），**不要**装到 desktop。
+* **安装入口**：侧栏「**插件**」页 →「添加插件」（官方 `dsh-client-ui-plugin-manager` 的
+  安装对话框，Host 自带 pnpm 11.7.0、失败自动还原 profile）。
+  ⚠️ **设置 → 内置插件**是只读清单，装不了东西。
+* 装完 **必须重启客户端**（该插件有 host 半区 `/sidebar/api/*` 路由）。
+* ⚠️ 该插件 v0.23.0 起 fs 路由**取消了工作区包含检查**（可读写宿主用户能访问的任意路径）
+  —— 已知安全取舍，知情后再装。
+* **可复用的只读工具**（`tmp/`，不进 git）：
+  * `tmp\list-host-official-packages.mjs` → 列 asar 内官方包名与版本
+  * `tmp\dump-asar.mjs <asar 内路径前缀>` → 把官方包源码/README 导出到 `tmp\asar-dump\`
+  * 两者只读，不改 asar，可放心跑。
+
 ---
 
 ## 变更记录
@@ -152,3 +182,4 @@
 | 2026-10-08 | **事故**：补丁写回 asar 时头部 JSON 长度/NUL 填充错误，客户端 app.asar 被写坏（121348951 → 121353555）；当次会话命令通道随后全面失效，未能修复。新增 §5 记录 asar 结构与教训，恢复脚本 `tmp\fix-asar-header.mjs`。 |
 | 2026-10-08 | 该会话 pwsh/grep/read 子进程通道故障：`subprocess-local: Windows Job runner exited with exit code 1 before proving its managed range empty`。若再次遇到，视为环境故障，不要反复重试同类命令。 |
 | 2026-10-08 | 客户端重装到 `D:\software\DSH`（旧 `D:\software\DeepSeek Harness` 已删），asar 恢复为干净的 121348951 字节。**补丁已成功写回**：头部 16 字节与其余全部字节保持一致，仅目标条目 200124→204716（+4592）。工具路径改为读 `tmp\paths.json`。 |
+| 2026-10-08 | 新增 §6「右侧栏编辑器选型」：查明宿主自带官方右侧栏（files/documentpreview/terminal/browser），但官方预览只读 + `dsh-api-workspace-files` 无写方法；选型 = 装 `dsh-better-sidebar@0.24.1`（走侧栏「插件」页安装），需求目录 `mods/sidebar-editor/`，日志 `logs/2026-10-08-sidebar-editor.md`。 |
