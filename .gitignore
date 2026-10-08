@@ -1,0 +1,14 @@
+# 临时脚本 / 临时产物
+tmp/
+*.tmp
+
+# 常见噪音
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+*.log
