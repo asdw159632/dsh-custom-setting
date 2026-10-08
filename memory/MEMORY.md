@@ -39,12 +39,17 @@
     已封装为脚本，推送一律走它：
 
     ```powershell
-    pwsh -File scripts/push.ps1
+    scripts\push.cmd
     ```
 
     脚本内部：`git-credential-manager get` 取到 PAT（直接调用可正常工作，
     只有经过 git 的 helper 机制才会挂）→ 拼 `Authorization: Basic <base64(user:pat)>`
     → `git -c http.extraHeader=... push`。
+  * 本机**只有 Windows PowerShell 5.1（无 `pwsh`）**，且 `.ps1` 需
+    `-ExecutionPolicy Bypass`，所以用 `push.cmd` 包装调用：
+    `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\push.ps1`。
+  * `scripts\push.ps1` **必须保存为 UTF-8 with BOM**：PS 5.1 对无 BOM 的
+    `.ps1` 按系统 ANSI 代码页（本机 GBK）解析，中文注释会导致语法错误。
   * 手工应急写法（token 从别处取）：
     ```powershell
     git -c "http.extraHeader=Authorization: Basic <base64(user:token)>" push origin main
@@ -65,7 +70,7 @@
   ├── mods/                # 各个 DSH 定制需求，一个需求一个子目录
   │   └── <需求名>/        # 内含该需求的源码、说明、状态
   ├── logs/                # 工作日志（每个阶段一篇）
-  ├── scripts/push.ps1     # 推送脚本（沙箱下唯一可行的推送方式）
+  ├── scripts/push.cmd     # 推送脚本（沙箱下唯一可行的推送方式）
   └── tmp/                 # 临时脚本，不提交
   ```
 
@@ -89,3 +94,4 @@
 | --- | --- |
 | 2026-10-08 | 建立本文件；记录远程同步目标与多文件夹组织约定。 |
 | 2026-10-08 | 修正凭据记录：`credential.helper` 在沙箱下不可用，推送改用 `scripts/push.ps1`（`http.extraHeader`）。 |
+| 2026-10-08 | 补充：本机无 `pwsh`，改用 `scripts\push.cmd`；`.ps1` 必须存为 UTF-8 with BOM。 |

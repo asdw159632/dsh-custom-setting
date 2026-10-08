@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     把本工作区的提交推送到 GitHub 远程仓库。
 
@@ -85,8 +85,14 @@ $gitArgs = @(
 if ($SetUpstream) { $gitArgs += '-u' }
 $gitArgs += @($Remote, $Branch)
 
+# 注意：git push 的正常输出（"To <url>"、进度）是走 stderr 的。
+# PowerShell 5.1 在 $ErrorActionPreference='Stop' 下会把原生命令的 stderr
+# 当成终止性错误（NativeCommandError）抛出来，所以这里临时放宽，改按退出码判断。
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 $out = & git @gitArgs 2>&1
 $code = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
 
 # 万一 git 把 URL/头部回显出来，做一次兜底脱敏
 $out | ForEach-Object { "$_".Replace($cred.Token, '<REDACTED>').Replace($basic, '<REDACTED>') }

@@ -27,6 +27,8 @@
 | `mods/README.md` | **新增**：`mods/` 下一个需求一个子目录的约定 |
 | `AGENTS.md` | **修改**：新增「工作区记忆 / 目录组织 / 远程仓库」小节；顺带修掉 3 处被误转义成 `\##` 的标题 |
 | `.gitignore` | **新增**：忽略 `tmp/` 及常见噪音 |
+| `scripts/push.ps1` | **新增**：绕开 credential helper 的推送脚本 |
+| `scripts/push.cmd` | **新增**：`push.ps1` 的 cmd 包装（PS 5.1 + ExecutionPolicy Bypass） |
 | `logs/2026-10-08-init-and-remote.md` | **新增**：本日志 |
 
 ## 执行步骤
@@ -69,7 +71,23 @@ git -c "http.extraHeader=Authorization: Basic $b64" push -u origin main
 ```
 
 已封装为 `scripts/push.ps1`（自动定位 GCM、读凭据、脱敏输出）。
-**后续推送一律使用 `pwsh -File scripts/push.ps1`，不要直接 `git push`。**
+**后续推送一律使用 `scripts\push.cmd`，不要直接 `git push`。**
+
+## 脚本自身踩的两个坑
+
+1. **本机没有 `pwsh`**，只有 Windows PowerShell 5.1
+   （`C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe`）。
+   故文档命令改为 `scripts\push.cmd`，内部以
+   `-NoProfile -ExecutionPolicy Bypass -File` 调用 `.ps1`。
+2. **`.ps1` 必须保存为 UTF-8 with BOM。** 无 BOM 时 PS 5.1 按系统 ANSI
+   代码页（本机 GBK）解析文件，中文注释直接导致语法错误：
+   `Unexpected token 'protocol=https...'`。已用
+   `[System.IO.File]::WriteAllText($p, $txt, (New-Object System.Text.UTF8Encoding($true)))`
+   重存。
+3. **`$ErrorActionPreference='Stop'` + 原生命令 `2>&1`**：PS 5.1 会把 git 写到
+   stderr 的正常输出（`To https://...`、进度）当成终止性错误
+   （`NativeCommandError`）抛出，导致脚本明明推送成功却报失败。
+   已改为调用前临时置为 `'Continue'`，调用后按 `$LASTEXITCODE` 判断。
 
 ## 验证
 
