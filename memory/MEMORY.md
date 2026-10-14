@@ -188,6 +188,29 @@
   * `tmp\dump-asar.mjs <asar 内路径前缀>` → 把官方包源码/README 导出到 `tmp\asar-dump\`
   * 两者只读，不改 asar，可放心跑。
 
+## 7. 极简模式（agent preset `minimal`）与 PowerShell（2026-10-14）
+
+> 详见 `mods/agent-preset-minimal/README.md`、日志 `logs/2026-10-14-minimal-mode-powershell.md`。
+> 结论一句话：**Windows 上极简模式唯一可用的工具就是 PowerShell 工具 `pwsh`。**
+
+* preset 声明在 asar 内 `@deepseek-ai/dsh-web-app/presets/minimal.patch.yml`；当前 GUI（desktop profile）
+  会加载它，因为 `~/.dsh/profiles/desktop/package.json` 的 bundles 含 `@deepseek-ai/dsh-web-app`，
+  而该包 `dsh.bundle.patch` 把 `presets/{standard,ptc,minimal,cordis}.patch.yml` 全部注册（默认 `standard`）。
+* 4 个内置 preset 的 id/文案：`standard` 标准模式、`ptc` PTC 模式、`minimal` 极简模式、`cordis` 创造模式
+  （字典在 `@deepseek-ai/dsh-client-ui-agent-preset`）。
+* 极简模式组成 = `persona`（固定提示词、无 runtime context）+ `persistent-shell` 组
+  （pty + terminal-bash/persistent-bash〔win32 禁用〕+ terminal-bash(pwsh)/persistent-pwsh〔非 win32 禁用〕）。
+  → Windows 下模型可见工具只有 `pwsh`（`@deepseek-ai/dsh-tool-pwsh-persistent`，ConPTY 持久 shell，300 s/命令）。
+* 可执行文件解析（`@deepseek-ai/dsh-pwsh-local` 的 `resolvePwshPath`）：PS7（`%ProgramFiles%\PowerShell\7\pwsh.exe`）
+  → PATH 里的 `pwsh.exe` → Windows PowerShell 5.1。**本机无 PS7、PATH 无 pwsh → 实际跑的是 PS 5.1（5.1.26100.9549）**，
+  工具名却仍叫 `pwsh`；本会话自己的 `pwsh` 工具同理。
+* 沙箱：`dsh-terminal-bash` 的 `spawnArgv()` 在非 `danger-full-access` 时用 `ctx.sandbox.confine()` 包裹
+  shell 启动 argv → workspace-write 下极简模式 PowerShell 同样受限；read-only 下可能以 ConstrainedLanguage
+  启动（编码固定/prompt 标记可能被拒，非 ASCII 输出可能跟随宿主代码页）。
+* 极简模式**不含**：AGENTS.md 指令、Skills、todo/planning、上下文压缩、subagent/workflow、文件读写工具、web 工具。
+* 新增只读 asar 检索工具（`tmp/`，不入库）：`scan-strings.mjs`（原文搜中文/英文串）、
+  `find-entry.mjs <关键词> [路径子串]`（按内容定位条目）、`list-entries.mjs <路径子串>`（只列路径）。
+
 ---
 
 ## 变更记录
@@ -204,3 +227,4 @@
 | 2026-10-08 | 客户端重装到 `D:\software\DSH`（旧 `D:\software\DeepSeek Harness` 已删），asar 恢复为干净的 121348951 字节。**补丁已成功写回**：头部 16 字节与其余全部字节保持一致，仅目标条目 200124→204716（+4592）。工具路径改为读 `tmp\paths.json`。 |
 | 2026-10-08 | 新增 §6「右侧栏编辑器选型」：查明宿主自带官方右侧栏（files/documentpreview/terminal/browser），但官方预览只读 + `dsh-api-workspace-files` 无写方法；选型 = 装 `dsh-better-sidebar@0.24.1`（走侧栏「插件」页安装），需求目录 `mods/sidebar-editor/`，日志 `logs/2026-10-08-sidebar-editor.md`。 |
 | 2026-10-08 | 补充 §6：实测 `dsh-better-sidebar` 与 `dsh-web-all@0.4.5` **不冲突**（无双挂载 / 无右栏注册 / 无前缀重叠）；家族 `bundle-guard` 针对的是 web profile 的 `dsh-web-ui-all` 那一套；已知小缺口 = 远程访问白名单缺 `/sidebar/ws/fs-watch`。 |
+| 2026-10-14 | 新增 §7：极简模式（preset `minimal`）在 Windows 上唯一工具就是 `pwsh`（持久 ConPTY PowerShell）；本机无 PS7/pwsh，实际回退 Windows PowerShell 5.1；终端 shell 同样受 `ctx.sandbox.confine()` 沙箱；需求目录 `mods/agent-preset-minimal/`。 |
