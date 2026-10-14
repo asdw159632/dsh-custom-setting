@@ -211,6 +211,36 @@
 * 新增只读 asar 检索工具（`tmp/`，不入库）：`scan-strings.mjs`（原文搜中文/英文串）、
   `find-entry.mjs <关键词> [路径子串]`（按内容定位条目）、`list-entries.mjs <路径子串>`（只列路径）。
 
+## 8. 能不能「切到 WSL 环境」操作（2026-10-14）
+
+> 详见 `mods/wsl-execution/README.md`、日志 `logs/2026-10-14-wsl-execution.md`。
+> 一句话：**没有一键切换开关；沙箱会话里 `wsl.exe` 被拒（E_ACCESSDENIED），完全访问会话里可用。**
+
+* **实测 A/B（同机同命令，只改会话权限）**：
+  * `workspace-write`：`wsl.exe -l -q` → `Wsl/E_ACCESSDENIED`，exit -1；切回沙箱后复测仍是拒绝。
+  * `danger-full-access`：`wsl.exe -l -q` 成功（Ubuntu-22.04 默认 / Ubuntu-18.04）；
+    `wsl.exe --cd 'D:\文档\DSH-plugin\DSH-custom' -- bash -lc 'uname -a; pwd; ls -1'` 成功，
+    `pwd` = `/mnt/d/文档/DSH-plugin/DSH-custom`。
+  * ⇒ 挡住 WSL 的是 DSH 沙箱，不是 WSL 本身。
+* **机制**：Windows 沙箱 = `dsh-sandbox-windows-acl`（`WRITE_RESTRICTED` 受限令牌 + Low 完整性 + ACL）；
+  `dsh-pwsh-sandbox` 与 `dsh-terminal-bash.spawnArgv()` 在非 `danger-full-access` 时用
+  `ctx.sandbox.confine(argv, policy)` 包裹启动 argv，子进程继承受限令牌。Windows 上 `ctx.shell` 固定是
+  `pwsh-sandbox`；preset 只能选工具，换不了执行世界/沙箱栈（都在 host 平面）。
+* **工作区映射**：`D:\文档\DSH-plugin\DSH-custom` ⇄ `/mnt/d/文档/DSH-plugin/DSH-custom`。
+* **本机 WSL**：注册表 `HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss` 有
+  Ubuntu-22.04（默认，BasePath `\\?\W:\Ubuntu-22.04`）与 Ubuntu-18.04（`D:\Ubuntu-18.04`）；
+  `C:\Windows\System32\bash.exe` 是 WSL shim，PATH 上的 `bash` 就是它。
+* **四条可行路线**：A 切「完全访问」+ pwsh 里调 `wsl.exe`（已验证，代价=无沙箱）；
+  B 自定义工具走 `ctx.subprocess.spawn(['wsl.exe', ...])`（不经 confine，workspace-write 也能用，
+  模板 `~/.dsh/.agent-presets/anchored-standard/custom-bash.mjs`，代价=绕过文件沙箱）；
+  C `dsh-terminal-bash` 的 `shellPath: wsl.exe`（仍被 confine，只有完全访问可行；env/就绪标记未验证）；
+  D 启用 `@linxin666/dsh-ssh`（`web-ui-ssh` 行默认 disabled，可在插件管理器启用）→ 6 个 `ssh_*` 工具
+  由 Host 直连，WSL 里跑 sshd 即可当 Linux 远主机用。
+* **侧栏终端**：`~/.dsh/profiles/desktop/cordis.patch.yml` 已把默认 shell 设成 `wsl.exe`；该通道由
+  `dsh-api-terminal-controller` 经 subprocess provider 启动，sandbox policy 只用于给无 cwd 的会话定默认目录
+  → 不受 shell 沙箱约束（按文档；人交互通道，Agent 不驱动）。
+* **安全边界**：命令一旦进 WSL，DSH 的 Windows 文件沙箱就不再是边界（WSL 侧经 9p 访问 /mnt/d）。
+
 ---
 
 ## 变更记录
@@ -228,3 +258,4 @@
 | 2026-10-08 | 新增 §6「右侧栏编辑器选型」：查明宿主自带官方右侧栏（files/documentpreview/terminal/browser），但官方预览只读 + `dsh-api-workspace-files` 无写方法；选型 = 装 `dsh-better-sidebar@0.24.1`（走侧栏「插件」页安装），需求目录 `mods/sidebar-editor/`，日志 `logs/2026-10-08-sidebar-editor.md`。 |
 | 2026-10-08 | 补充 §6：实测 `dsh-better-sidebar` 与 `dsh-web-all@0.4.5` **不冲突**（无双挂载 / 无右栏注册 / 无前缀重叠）；家族 `bundle-guard` 针对的是 web profile 的 `dsh-web-ui-all` 那一套；已知小缺口 = 远程访问白名单缺 `/sidebar/ws/fs-watch`。 |
 | 2026-10-14 | 新增 §7：极简模式（preset `minimal`）在 Windows 上唯一工具就是 `pwsh`（持久 ConPTY PowerShell）；本机无 PS7/pwsh，实际回退 Windows PowerShell 5.1；终端 shell 同样受 `ctx.sandbox.confine()` 沙箱；需求目录 `mods/agent-preset-minimal/`。 |
+| 2026-10-14 | 新增 §8：WSL 可用性 A/B 实测——沙箱会话（read-only/workspace-write）里 `wsl.exe` 被拒（`Wsl/E_ACCESSDENIED`），`danger-full-access` 下正常；工作区 = `/mnt/d/文档/DSH-plugin/DSH-custom`；无官方「切 WSL」开关，可行路线 A/B/C/D 见 `mods/wsl-execution/`。 |
