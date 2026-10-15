@@ -243,6 +243,44 @@
 
 ---
 
+## 9. PowerShell 里的 `dsh` 命令由谁接管（2026-10-14）
+
+> 详见 `mods/dsh-command-desktop/README.md`、日志 `logs/2026-10-14-dsh-command-desktop.md`。
+> 一句话：**本机 PowerShell 的 `dsh` = npm 全局 shim 指向旧 CLI 0.1.0-rc.8；
+> 桌面端自带 0.2.0-rc.2 的 `dsh.cmd` 且有官方接管机制（PATH 首位 + 归属键），但从未安装过。**
+
+* **`dsh` 指向哪儿**：`npm prefix` = `C:\Users\Zhang Liang\AppData\Roaming\npm`（用户 PATH 末位），
+  `dsh.cmd` / `dsh.ps1` / `dsh` 三个 shim → `node_modules\@deepseek-ai\dsh`（**junction**）
+  → `D:\software\DeepseekHarness\node_modules\@deepseek-ai\dsh` = **0.1.0-rc.8**。
+  全机只有这一个 `dsh` 安装；无别名/函数。
+* **桌面端自带的那套**：`D:\software\DSH\resources\runtime\cli\bin\dsh.cmd`（5 行）→
+  `ELECTRON_RUN_AS_NODE=1 "<DSH>\DeepSeek Harness.exe" --expose-internals
+  "<DSH>\resources\app.asar\dsh\node_modules\@deepseek-ai\dsh-desktop-host\lib\cli.js"`，
+  实测 `--version` = **0.2.0-rc.2**（= GUI 宿主）。**Electron 可执行文件就是它的 Node 运行时**，
+  不用另装 Node；另有 `<DSH>\resources\runtime\primary-runtime\dependencies\node\bin\node.exe`（24.x）。
+* **官方接管机制（Windows 不是覆盖 shim）**：`runtime\cli\command-manager.js` + `command-path.ps1`：
+  把 `runtime\cli\bin` **插到用户 PATH 首位**，归属记录写 `HKCU\Software\DeepSeekHarness\Command`
+  （`Directory` / `PathWasAbsent` / `RetainedEntries`）→ 可"修复/移除"并原样恢复，**从不删别人的安装**。
+  macOS 才是 `/usr/local/bin/dsh` 符号链接 + `.dsh-desktop-command.json` 收据。
+* **本机现状 = 未安装**（2026-10-14 核对）：归属键不存在、`runtime\cli\bin` 不在 PATH。
+* **入口在自绘标题栏**：win32 的 `Menu.setApplicationMenu` 只有不可见 devTools 项，托盘菜单只有
+  「打开应用/退出」。真正的入口是 preload（`/lib/preload-app.cjs` `installWindowsMenu()`）
+  注入的 40px 标题栏菜单，**「应用」按钮**（旁边是「编辑」）→ 弹出 `applicationItems()`：
+  关于 / 检查更新… / **管理 dsh 命令…** / 退出。
+* **⚠️ desktop profile 被 Electron 独占**：`dsh --profile desktop` 报
+  `error: profile "desktop" is managed exclusively by the Electron application`
+  ⇒ 桌面端 `dsh` **不能 boot GUI 那个 profile**，只能带 `web` / `tui` / `headless` 等。
+  且用 0.2.0-rc.2 boot 旧 `web` profile 会**跳过 3 个 0.1.x 线插件**
+  （dshmarket@1.18.0 / dsh-chat-import@0.7.0 / dsh-better-sidebar@0.18.0）。
+* **PowerShell 命令解析语义（实测，反直觉但很关键）**：按 PATH 顺序找**第一个含 `dsh` shim 的目录**，
+  再在**该目录内**按 `.ps1` → PATHEXT 取命令 —— **目录优先级 > 扩展名优先级**。
+  所以桌面端目录**只有 `dsh.cmd`、没有 `dsh.ps1`**，照样压过后面 npm 目录里的 `dsh.ps1`。
+  实验脚本 `tmp\path-resolve-test.ps1`。
+* **沙箱行为**：`workspace-write` 会话里**装不了**——写 HKCU 被 `UnauthorizedAccessException` 拒，
+  `node command-manager.js inspect` 报 `{"ok":false,"code":"EPERM","message":"spawn EPERM"}`
+  （沙箱禁 MSYS/子进程 signal pipe 同款限制）。⇒ 安装必须由用户点 GUI（GUI 子进程不受沙箱约束）。
+* **`dsh --dump-config` 会写 `<profile>\cordis.yml`**（不是纯只读！），沙箱下报 EPERM。
+
 ## 变更记录
 
 | 日期 | 内容 |
@@ -259,3 +297,4 @@
 | 2026-10-08 | 补充 §6：实测 `dsh-better-sidebar` 与 `dsh-web-all@0.4.5` **不冲突**（无双挂载 / 无右栏注册 / 无前缀重叠）；家族 `bundle-guard` 针对的是 web profile 的 `dsh-web-ui-all` 那一套；已知小缺口 = 远程访问白名单缺 `/sidebar/ws/fs-watch`。 |
 | 2026-10-14 | 新增 §7：极简模式（preset `minimal`）在 Windows 上唯一工具就是 `pwsh`（持久 ConPTY PowerShell）；本机无 PS7/pwsh，实际回退 Windows PowerShell 5.1；终端 shell 同样受 `ctx.sandbox.confine()` 沙箱；需求目录 `mods/agent-preset-minimal/`。 |
 | 2026-10-14 | 新增 §8：WSL 可用性 A/B 实测——沙箱会话（read-only/workspace-write）里 `wsl.exe` 被拒（`Wsl/E_ACCESSDENIED`），`danger-full-access` 下正常；工作区 = `/mnt/d/文档/DSH-plugin/DSH-custom`；无官方「切 WSL」开关，可行路线 A/B/C/D 见 `mods/wsl-execution/`。 |
+| 2026-10-14 | 新增 §9：PowerShell 的 `dsh` = npm 全局 shim → 旧 CLI **0.1.0-rc.8**；桌面端自带 **0.2.0-rc.2** 的 `dsh.cmd` 且有官方接管机制（用户 PATH 首位 + `HKCU\Software\DeepSeekHarness\Command` 归属键），**从未安装**。入口在 preload 自绘标题栏的「应用」按钮 →「管理 dsh 命令…」。实测 PowerShell 解析**目录优先级 > 扩展名优先级**（只有 `dsh.cmd` 也能压过 `dsh.ps1`）。desktop profile 被 Electron 独占，CLI 不能 boot。沙箱内装不了（HKCU 拒写 / spawn EPERM）。需求目录 `mods/dsh-command-desktop/`（含只读校验 `verify.ps1`），日志 `logs/2026-10-14-dsh-command-desktop.md`。**待用户点 GUI 安装**。 |

@@ -1,0 +1,91 @@
+# 定制模式（agent preset id: custom）—— 由「极简模式」派生。
+#
+# 本文件是一个标准的 dsh profile patch 层片段：一个顶层 patch 列表，只有一条
+# insert，插入一个新的 `@deepseek-ai/dsh-agent-preset` 声明行。
+# 安装方式（装到 GUI 所用 profile 的 cordis.patch.yml 里）见同目录 README.md /
+# install.sh。
+#
+# 组成 = 极简模式（@deepseek-ai/dsh-web-app/presets/minimal.patch.yml）原样，
+# 外加两个新工具行：
+#   1. tool-fs        → 文件工具组：read / read_image / write / edit
+#                       （read_image 在 0.2.0-rc.2 里没有单独插件，只能整组挂）
+#   2. tool-ask-user  → ask_user_question
+#
+# 注意：极简模式自带的 persistent-bash 注册的工具名就叫 `bash`（持久式），所以这里
+# 不能再挂 @deepseek-ai/dsh-tool-bash —— 同名会在同一 preset scope 里报
+# `tool "bash" is already registered`，整个预设挂不上（0.2.0-rc.2 实测）。
+
+- insert:
+    - id: preset-custom
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: custom
+        name: 定制模式
+        description: 极简模式（终端命令 bash）之上，增加文件工具（read / read_image / write / edit）与 ask_user_question。
+        order: 5
+        plugins:
+          # ── 以下与 minimal 逐字一致：固定提示词 persona（无 runtime context）──
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: You are a helpful software engineer assistant.
+              complete: true
+              includeRuntimeContext: false
+
+          # ── 以下与 minimal 逐字一致：持久终端组（pty + 持久 bash/pwsh）──
+          # Linux 上生效的是 persistent-bash，工具名 `bash`；
+          # Windows 上它被平台门禁用，生效的是 persistent-pwsh，工具名 `pwsh`。
+          - id: persistent-shell
+            name: cordis:group
+            group: true
+            isolate:
+              terminals: true
+            config:
+              - id: pty
+                name: '@deepseek-ai/dsh-terminal'
+              - id: terminal-bash
+                name: '@deepseek-ai/dsh-terminal-bash'
+                disabled: !!js process.platform === 'win32'
+                config:
+                  timeoutMs: 300000
+              - id: persistent-bash
+                name: '@deepseek-ai/dsh-tool-bash-persistent'
+                disabled: !!js process.platform === 'win32'
+                config:
+                  timeoutMs: 300000
+                  description: |-
+                    Run commands in a bash shell
+                    * When invoking this tool, the contents of the "command" parameter does NOT need to be XML-escaped.
+                    * Network access depends on the task environment. Prefer configured mirrors/proxies when they are available.
+                    * State is persistent across command calls and discussions with the user.
+                    * To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.
+                    * Please avoid commands that may produce a very large amount of output.
+                    * Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.
+              - id: terminal-pwsh
+                name: '@deepseek-ai/dsh-terminal-bash'
+                disabled: !!js process.platform !== 'win32'
+                config:
+                  shellDialect: pwsh
+                  timeoutMs: 300000
+              - id: persistent-pwsh
+                name: '@deepseek-ai/dsh-tool-pwsh-persistent'
+                disabled: !!js process.platform !== 'win32'
+                config:
+                  timeoutMs: 300000
+                  description: |-
+                    Run commands in a PowerShell shell
+                    * When invoking this tool, the contents of the "command" parameter does NOT need to be XML-escaped.
+                    * You don't have access to the internet via this tool.
+                    * State is persistent across command calls and discussions with the user.
+                    * Use native Windows paths (C:\...) and $env:NAME variables; this is PowerShell, not bash.
+                    * Please avoid commands that may produce a very large amount of output.
+                    * Please run long lived commands in the background, e.g. 'Start-Job' or start a server with Start-Process.
+
+          # ── 新增 1/2：文件工具组（read / read_image / write / edit）──
+          # read_image 只存在于这个包里，无法只取其中一个工具。
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+
+          # ── 新增 2/2：ask_user_question ──
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
