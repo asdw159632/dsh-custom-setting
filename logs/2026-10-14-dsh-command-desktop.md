@@ -38,6 +38,13 @@
    托盘菜单只有「打开应用/退出」⇒ 继续查 `/lib/preload-app.cjs` 的 `installWindowsMenu()`，
    确认入口是 **preload 注入的自绘 40px 标题栏菜单：「应用」按钮**（旁边「编辑」），
    点击后 `invoke("dsh-desktop:windows-menu","application",…)` 弹出 `applicationItems()`。
+   菜单项顺序：关于 / ── / 检查更新… / **管理 dsh 命令…（第 4 项）** / ── / 退出。
+   一个后台并行检索独立复核了同一结论，并补齐两个要点：
+   * **挂载门槛**：`installWindowsMenu()` 只在 `[data-shell-overlay]` 出现后才挂按钮；
+   * **⚠️ 仅 Electron 主窗口**：调用被包在
+     `location.protocol === "dsh-app:" && location.hostname === "app"` 内
+     ⇒ **浏览器里的 `dsh web` 页面（含 `DSH_WEB_URL=http://127.0.0.1:19387`）没有 preload，
+     没有「应用/编辑」按钮**。这条对"用户此刻正用浏览器跟我对话"很关键。
 
 ### 第三步：两个限制 + 沙箱边界
 
@@ -69,6 +76,7 @@
 
 * `mods/dsh-command-desktop/README.md` —— 定位证据、官方机制、入口位置、操作步骤、备选方案、验证
 * `mods/dsh-command-desktop/verify.ps1` —— 纯只读 7 项校验（安装前基线 `FAIL=3 WARN=2`）
+* `mods/dsh-command-desktop/confirm.ps1` —— 纯只读入口前置检查（客户端是否在跑 / profile / 监听端口）
 * `memory/MEMORY.md` §9 + 变更记录
 * `tmp/path-resolve-test.ps1` —— 解析优先级实验（tmp 不入库）
 * `tmp/asar-dump/lib/main.js`、`tmp/asar-dump/lib/preload-app.cjs` —— 只读导出物（tmp 不入库）

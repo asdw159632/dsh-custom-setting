@@ -266,7 +266,11 @@
 * **入口在自绘标题栏**：win32 的 `Menu.setApplicationMenu` 只有不可见 devTools 项，托盘菜单只有
   「打开应用/退出」。真正的入口是 preload（`/lib/preload-app.cjs` `installWindowsMenu()`）
   注入的 40px 标题栏菜单，**「应用」按钮**（旁边是「编辑」）→ 弹出 `applicationItems()`：
-  关于 / 检查更新… / **管理 dsh 命令…** / 退出。
+  关于 / ── / 检查更新… / **管理 dsh 命令…（第 4 项）** / ── / 退出。
+  **⚠️ 该入口只在 Electron 客户端主窗口（`dsh-app://app/`）里**：preload 的调用被包在
+  `location.protocol === "dsh-app:" && hostname === "app"` 内 ⇒ **浏览器打开的 `dsh web` 页面
+  （含 `DSH_WEB_URL`）没有 preload、没有这两个按钮**，在那里找不到是正常的。
+  按钮位置：侧栏展开时在左上角折叠按钮右侧 48px，收起时移到「新建会话」之后 84px。
 * **⚠️ desktop profile 被 Electron 独占**：`dsh --profile desktop` 报
   `error: profile "desktop" is managed exclusively by the Electron application`
   ⇒ 桌面端 `dsh` **不能 boot GUI 那个 profile**，只能带 `web` / `tui` / `headless` 等。

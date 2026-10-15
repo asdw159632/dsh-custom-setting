@@ -123,23 +123,51 @@ dsh: skipping profile bundle "dsh-better-sidebar": Plugin dsh-better-sidebar@0.1
 
 ### 6.1 入口在哪（已定位到源码级）
 
+> ⚠️ **必须先分清你在哪个窗口操作。** 这个入口**只存在于 Electron 桌面客户端的主窗口**。
+> preload 里 `installWindowsMenu()` 的调用被包在
+> `if (location.protocol === "dsh-app:" && location.hostname === "app")` 块内，且 `process.platform !== "win32"` 直接 return。
+>
+> * ✅ **桌面客户端窗口**（`dsh-app://app/`）→ 有「应用 / 编辑」按钮，能装。
+> * ❌ **浏览器里打开的 `dsh web` 页面**（例如当前会话所在的 `http://127.0.0.1:19387`）→ **没有 preload，没有这两个按钮**。
+>   在浏览器里找不到是正常的，不是 bug。
+> * ❌ 登录/更新等非 primary 窗口同样没有。
+
 Windows 上**没有**传统的窗口菜单栏：主进程 `Menu.setApplicationMenu(...)` 在 win32 只塞了两个不可见的
 devTools 项，窗口还有 `autoHideMenuBar: true` / `setMenu(null)`；托盘菜单也只有「打开应用 / 退出」。
+主窗口是 `titleBarStyle: "hidden"` + `titleBarOverlay: { height: 40 }`（自绘标题栏）。
 
 真正的入口由 **preload 注入**：`/lib/preload-app.cjs` 的 `installWindowsMenu()` 在页面里
 shadow DOM 挂了一条 40px 高的自绘标题栏菜单，`position: fixed; top: 0; left: 48px`，
-两个按钮：
+两个按钮（**左键单击**触发；坐标取自按钮的 `rect.left` / `rect.bottom`，不是右键菜单）：
 
 | 按钮文案 | 作用 |
 | --- | --- |
 | **「应用」**（英文 `Application`） | `ipcRenderer.invoke("dsh-desktop:windows-menu", "application", …)` → 主进程 `applicationItems()` |
 | 「编辑」（英文 `Edit`） | 同上，`"edit"` → 撤销/重做/剪切/复制/粘贴 |
 
-`applicationItems()` 的项依次是：关于 DeepSeek Harness / 检查更新… / **管理 dsh 命令…** / 退出
-（macOS 上才在系统菜单栏；win32 走上面这个自绘按钮）。
+`applicationItems()` 的项依次是：
 
-⇒ **点窗口标题栏（左上角，大约在窗口图标右侧）的「应用」按钮**，弹出的菜单里第 3 项就是 **「管理 dsh 命令…」**。
-若看不见：按 `Alt` 试试，或先用 `Tab` 把焦点移到标题栏再按 `↓` 展开（按钮支持方向键）。
+```
+关于 DeepSeek Harness
+───
+检查更新…
+管理 dsh 命令…        ← 第 4 项
+───
+退出
+```
+
+（macOS 上才在系统菜单栏；win32 走上面这个自绘按钮。开发版会额外多「刷新页面 / 重启应用与 Host」。）
+
+⇒ **左键单击窗口左上角标题栏里的「应用」按钮**，弹出菜单里第 **4** 项就是 **「管理 dsh 命令…」**。
+
+**位置锚点**：按钮的 `left` 默认 48px（`--dsh-windows-menu-start`）。侧栏**展开**时在左上角侧栏折叠按钮右侧（48px）；
+侧栏**收起**时移到「新建会话」按钮之后（84px）——由 `dsh-client-ui-sidebar` 的
+`html[data-windows-titlebar]:has([data-sidebar-collapsed=true]){--dsh-windows-menu-start:84px}` 控制。
+
+若看不见：按 `Alt` 试试；或用键盘——首按钮 `tabIndex=0`（`Tab` 可及），方向键切换、`↓` 展开。
+
+**挂载门槛**：`installWindowsMenu()` 只在页面出现 `[data-shell-overlay]`（即主壳层渲染完成）后才把按钮挂上去，
+所以启动瞬间看不到属正常。
 
 ### 6.2 安装
 
@@ -167,6 +195,17 @@ shadow DOM 挂了一条 40px 高的自绘标题栏菜单，`position: fixed; top
 
 ## 8. 验证
 
+### 8.1 操作前：确认 GUI 入口具备条件
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File mods\dsh-command-desktop\confirm.ps1
+```
+
+纯只读，回答三件事：桌面客户端在不在跑、当前会话的 profile / `DSH_HOME`、DSH 的 HTTP 监听端口。
+沙箱会话下「读进程命令行」与「查 TCP 连接」会被拒——脚本会明确标注"结果不可当没有读"，并给出非沙箱的替代命令。
+
+### 8.2 操作后：核对接管是否生效
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File mods\dsh-command-desktop\verify.ps1
 ```
@@ -185,7 +224,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mods\dsh-command-desktop\ver
 
 安装前基线实测：`FAIL=3 WARN=2` → `verify: FAILED`（符合预期）。
 
-> ⚠️ 维护注意：`verify.ps1` **必须保存为 UTF-8 with BOM**（MEMORY §4 同款坑）。
+> ⚠️ 维护注意：`verify.ps1` 与 `confirm.ps1` **必须保存为 UTF-8 with BOM**（MEMORY §4 同款坑）。
 > PS 5.1 会把无 BOM 的 `.ps1` 按系统 ANSI（本机 GBK）解析，中文注释直接语法错误。
 > 用本仓库的编辑器改完脚本后，确认前 3 字节是 `EF BB BF`；丢了就补：
 >
@@ -194,6 +233,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mods\dsh-command-desktop\ver
 > $t=[IO.File]::ReadAllText($p,[Text.Encoding]::UTF8)
 > [IO.File]::WriteAllText($p,$t,(New-Object Text.UTF8Encoding($true)))
 > ```
+>
+> 本项目里 `write`/`edit` 工具落盘的是**无 BOM** UTF-8，所以每次改完这两个脚本都要补一次。
 
 补充手工验证：
 
@@ -246,10 +287,29 @@ asar 只读检索工具（`tmp/`，不入库）：`list-entries.mjs` / `find-ent
 | 文件 | 位置 | 内容 |
 | --- | --- | --- |
 | `/lib/main.js` | 约 7236 行 | `DesktopCommandManager`（inspect/install/remove + 三个原生对话框） |
-| `/lib/main.js` | 约 11874 行 | `applicationItems()`：`cliCommandMenu` → `commandManager.show()` |
+| `/lib/main.js` | 约 11874 行 | `applicationItems()`；**11896 行是全 asar 唯一的 `commandManager.show()`** |
 | `/lib/main.js` | 约 6653 行 | 中文文案 `zh.cliCommandMenu = "管理 dsh 命令…"` |
-| `/lib/main.js` | 约 11930 行 | win32 只注册不可见 devTools 菜单（所以入口不在原生菜单栏） |
+| `/lib/main.js` | 约 11930 行 | win32 只注册两个 `visible:false` 的 devTools 项（入口不在原生菜单栏） |
+| `/lib/main.js` | 约 11074 行 | win32 主窗口 `titleBarStyle:"hidden"` + `titleBarOverlay:{height:40}` |
+| `/lib/main.js` | 约 11970 行 | `ipcMain.handle(DESKTOP_IPC.windowsMenu, …)`：win32 专用、校验 sender 必须是主窗口主帧 |
 | `/lib/preload-app.cjs` | 约 454 行 | `installWindowsMenu()`：自绘标题栏「应用 / 编辑」按钮 |
-| `/lib/preload-app.cjs` | 约 515 行 | `ipcRenderer.invoke(DESKTOP_IPC.windowsMenu, "application", …)` |
-| `/lib/preload-app.cjs` | 约 298/318 行 | 中文文案 `application: "应用"` / `edit: "编辑"` |
+| `/lib/preload-app.cjs` | 约 460 行 | `:host{position:fixed;top:0;left:var(--dsh-windows-menu-start,48px);…}` |
+| `/lib/preload-app.cjs` | 约 509 行 | `getBoundingClientRect()` → `invoke(windowsMenu, name, rect.left, rect.bottom)`（**左键**，非右键） |
+| `/lib/preload-app.cjs` | 约 543 行 | 挂载门槛 `querySelector("[data-shell-overlay]")`（主壳层就绪后才挂） |
+| `/lib/preload-app.cjs` | 约 859 行 | 仅在 `location.protocol === "dsh-app:" && hostname === "app"` 内调用 ⇒ **浏览器里没有** |
+| `dsh-client-ui-sidebar/lib/client.js` | 约 6213 行 | `--dsh-windows-menu-start:84px`（侧栏收起时按钮右移） |
+
+**反证（渲染端只有 preload 这一条链）**：`dsh-desktop:windows-menu` 全 asar 仅命中 2 个条目
+（`/lib/main.js`、`/lib/preload-app.cjs`）；`dsh-windows-menu-start` 命中 4 处（sidebar ×3 + preload ×1）。
+Web 前端包（`ui-layout` / `ui-sidebar` 等）完全不参与入口构建。
+
+**复现命令**
+
+```powershell
+node tmp\find-entry.mjs "dsh-desktop:windows-menu"
+node tmp\find-entry.mjs "installWindowsMenu"
+node tmp\find-entry.mjs "dsh-windows-menu-start"
+node tmp\dump-asar.mjs /lib/preload-app.cjs /lib/main.js   # 只写 tmp/asar-dump/
+```
+
 
