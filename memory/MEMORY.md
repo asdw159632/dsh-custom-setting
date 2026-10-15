@@ -285,6 +285,45 @@
   （沙箱禁 MSYS/子进程 signal pipe 同款限制）。⇒ 安装必须由用户点 GUI（GUI 子进程不受沙箱约束）。
 * **`dsh --dump-config` 会写 `<profile>\cordis.yml`**（不是纯只读！），沙箱下报 EPERM。
 
+## 10. 定制模式（agent preset `custom`）— Windows 桌面客户端（2026-10-15）
+
+> 详见 `mods/agent-preset-custom/README.md`、日志 `logs/2026-10-15-agent-preset-custom-windows.md`。
+> 一句话：**定制模式 = 极简模式（逐字复制）+ `@deepseek-ai/dsh-tool-fs` + `@deepseek-ai/dsh-tool-ask-user`。**
+
+* 来源：用户先在 **WSL 侧工作区**（`/home/zhangliang/dsh-custom`）做了这个模式，本工作区按同样组成复刻。
+  **两边 `custom.patch.yml` 与探针逐字节一致**（sha256 `E81590C3…AEFB`）；安装/校验脚本按平台分开：
+  Linux 的 `install.sh`/`uninstall.sh`/`verify.sh` ↔ Windows 的 `install.ps1`/`uninstall.ps1`/`verify.ps1`
+  （+ Windows 特有的 `tools/verify-real-profile.ps1`）。
+* **同一份 patch，两个平台工具名不同**：Linux 极简 = `bash`（`dsh-tool-bash-persistent`）、
+  Windows 极简 = `pwsh`（`dsh-tool-pwsh-persistent`），靠 `!!js process.platform === 'win32'` 切换。
+  0.2.0-rc.2 实测：
+  * 模板 profile（`verify.ps1`）：`minimal tools(1)=pwsh`；`custom tools(6)=ask_user_question, edit, pwsh, read, read_image, write`
+  * 真实 desktop profile 副本：`minimal tools(18)`（pwsh + 第三方 task-board 的 17 个 `task_board_*`）、
+    `custom tools(23)`（上述 + read/read_image/write/edit/ask_user_question）。那 17 个注册在 **profile 层**，
+    所有模式都看得到，不是本模式引入的。
+* **两条硬约束（别再试）**：① Linux 上极简自带的工具名就叫 `bash`，再挂 `@deepseek-ai/dsh-tool-bash`
+  会同名冲突致**整个预设挂载失败**（`tool "bash" is already registered in this scope`）；
+  ② `read_image` 只存在于 `@deepseek-ai/dsh-tool-fs`，该包无条件注册 read/read_image/write/edit，没有开关 ⇒ 只能整组加。
+* 落地：`~\.dsh\profiles\desktop\cordis.patch.yml` 里由 `install.ps1` 写入托管块
+  （标记 `# >>> agent-preset-custom (定制模式) managed block >>>` … `<<<`，与 Linux 版同标记），
+  幂等、先整份备份 `.bak-<时间戳>`。本次实装 3267 B `710E84A5…321E` → 8406 B `F898226A…D11B`，
+  原 92 行逐字保留，profile 内其它文件哈希未变。
+* 运行中的宿主**已加载**：`cordis_inspect_query`（host `Config`/`listConfigs`，
+  `name=@deepseek-ai/dsh-agent-preset`）安装前 4 行、安装后 **5 行**（多出 `include:preset-custom`）
+  ⇒ 桌面客户端**热加载** profile 补丁，不必以「重启后才有」为前提。
+* **校验方式（Windows，可复用）**：
+  * `verify.ps1`：临时 `DSH_HOME`（`--from-default-profile web`）→ 装托管块 + 探针行 → `--dump-config`
+    → `Start-Process` 起临时实例读 `[probe]` 行 → `Stop-Process`；产物在 `tmp/agent-preset-custom-verify/`。
+  * `tools/verify-real-profile.ps1`：复制真实 profile（`node_modules` 走 junction，profile 名改 `realverify`
+    以绕过 Electron 独占）起临时实例；产物在 `tmp/real-verify/`。
+  * 两条都**退出码 0、`agent preset` 告警为空**。`verify.ps1` 不需要提权（只写 `tmp/`）。
+* Windows 侧注意：`.ps1` 必须 **UTF-8 with BOM** 且用 `-ExecutionPolicy Bypass -File` 起；
+  profile 在工作区外，`workspace-write` 会话里安装需一次提权；`Get-CimInstance` 在沙箱里被拒，查进程用 `Get-Process`。
+* ⚠️ **并发会话教训**：本模式的文件曾被同工作区另一会话（`mods/dsh-command-desktop`）的仓库级 `git add`
+  卷进它的提交 `4ed60e8`（内容无损，blob 一致）。多会话并行时**提交前先 `git status -uall`，按路径 add，不要 `-A`**。
+
+---
+
 ## 变更记录
 
 | 日期 | 内容 |
@@ -302,3 +341,4 @@
 | 2026-10-14 | 新增 §7：极简模式（preset `minimal`）在 Windows 上唯一工具就是 `pwsh`（持久 ConPTY PowerShell）；本机无 PS7/pwsh，实际回退 Windows PowerShell 5.1；终端 shell 同样受 `ctx.sandbox.confine()` 沙箱；需求目录 `mods/agent-preset-minimal/`。 |
 | 2026-10-14 | 新增 §8：WSL 可用性 A/B 实测——沙箱会话（read-only/workspace-write）里 `wsl.exe` 被拒（`Wsl/E_ACCESSDENIED`），`danger-full-access` 下正常；工作区 = `/mnt/d/文档/DSH-plugin/DSH-custom`；无官方「切 WSL」开关，可行路线 A/B/C/D 见 `mods/wsl-execution/`。 |
 | 2026-10-14 | 新增 §9：PowerShell 的 `dsh` = npm 全局 shim → 旧 CLI **0.1.0-rc.8**；桌面端自带 **0.2.0-rc.2** 的 `dsh.cmd` 且有官方接管机制（用户 PATH 首位 + `HKCU\Software\DeepSeekHarness\Command` 归属键），**从未安装**。入口在 preload 自绘标题栏的「应用」按钮 →「管理 dsh 命令…」。实测 PowerShell 解析**目录优先级 > 扩展名优先级**（只有 `dsh.cmd` 也能压过 `dsh.ps1`）。desktop profile 被 Electron 独占，CLI 不能 boot。沙箱内装不了（HKCU 拒写 / spawn EPERM）。需求目录 `mods/dsh-command-desktop/`（含只读校验 `verify.ps1`），日志 `logs/2026-10-14-dsh-command-desktop.md`。**待用户点 GUI 安装**。 |
+| 2026-10-15 | 新增 §10：把 WSL 侧的**「定制模式」**（preset `custom` = 极简 + `tool-fs` + `tool-ask-user`）复刻到 Windows 桌面客户端并实装进 desktop profile。同一份 patch 在 Windows 上工具名是 `pwsh`（Linux 是 `bash`）；实测 6 工具（模板 profile）/ 23 工具（真实 profile 副本，含第三方 task-board 的 17 个）。活宿主 inspect 安装后 5 行（多出 `include:preset-custom`）⇒ 热加载。需求目录 `mods/agent-preset-custom/`，日志 `logs/2026-10-15-agent-preset-custom-windows.md`。 |
