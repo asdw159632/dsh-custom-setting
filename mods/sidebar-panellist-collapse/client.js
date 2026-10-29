@@ -1,34 +1,32 @@
 /**
- * sidebar-panellist-collapse —— 给左侧栏加一个「展开 / 收起全局面板列表」按钮。
+ * sidebar-panellist-collapse —— 左侧栏「全局面板列表」的展开 / 收起控制。
  *
- * 背景：左侧栏顶部是皮肤的角色动图，动图下面是「全局面板」列表（插件 / 任务看板 /
- * 技能中心 / 智能体 / Git / SSH / 更多）。这份列表占掉侧栏一大块高度，工作区只剩很少
- * 空间。本插件在侧栏底部（`sidebar.footer.action` 官方扩展位）加一个折叠按钮，
- * 折叠时隐藏那份列表，把空间让给工作区；状态存 localStorage，刷新后保持。
+ * 位置：按钮插在面板列表（`nav[role="navigation"]`）之后、工作区之前，作为一条很薄的折叠条。
+ * 折叠行为：只把列表的**高度**收掉，保留它自己的 `margin-top`。
  *
- * 实现要点：
- *   - 按钮通过官方 slot 注册（不替换任何内置 UI，replaceRisk: none）；
- *   - 折叠效果用一条样式规则实现：`body[data-dsh-panellist-collapsed]` 下隐藏
- *     `[data-slot="sidebar.panellist"]`（槽位座位），并带一条 nav 兜底选择器；
- *   - 文案走 Client locale 服务（zh / en 字典 + 当前语言兜底）；
- *   - 所有资源都在 apply 内用 ctx.effect 注册，卸载时自动清理。
+ * 为什么不能用 display:none（重要）：
+ *   orca-link 皮肤的动图舞台是靠面板列表自身的 margin-top 撑出来的
+ *   （patches.css: `[data-surface=sidebar] > :first-child > nav { margin-top:
+ *   calc(var(--orca-stage, 300px) - 116px) }`）。`display:none` 会把这条 margin 一起
+ *   去掉，动图的舞台就塌了、工作区顶上来盖住动图。所以这里用 height: 0 + overflow: hidden，
+ *   margin 保留 → 动图位置完全不变，工作区停在动图下方。
+ *
+ * 状态存在 localStorage，刷新/重启保持；文案走 Client locale（zh/en + 当前语言兜底）。
  */
 window.__ModuleLoader__.load({
   id: '@local/dsh-panellist-collapse',
   factory(require) {
-    const React = require('react');
-    const h = React.createElement;
-
     const NS = 'dsh-panellist-collapse';
     const STORAGE_KEY = 'dsh.panellist.collapsed';
     const BODY_ATTR = 'data-dsh-panellist-collapsed';
+    const ROW_CLASS = 'dsh-panellist-collapse-row';
+    const BUTTON_CLASS = 'dsh-panellist-collapse-button';
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+
     const DICTS = {
       zh: { collapse: '收起面板列表', expand: '展开面板列表' },
       en: { collapse: 'Collapse panel list', expand: 'Expand panel list' },
     };
-
-    /** 折叠状态变更的本地监听（同一个页面里可能挂多个组件实例）。 */
-    const listeners = new Set();
 
     const readCollapsed = () => {
       try { return window.localStorage.getItem(STORAGE_KEY) === '1'; } catch { return false; }
@@ -36,46 +34,28 @@ window.__ModuleLoader__.load({
     const writeCollapsed = (value) => {
       try { window.localStorage.setItem(STORAGE_KEY, value ? '1' : '0'); } catch { /* 隐私模式等场景忽略 */ }
     };
-    const notify = () => { for (const listener of [...listeners]) listener(); };
+    const findNav = () =>
+      document.querySelector('[data-dsh-surface="sidebar"] [class*="panelList"]') ||
+      document.querySelector('[data-dsh-surface="sidebar"] nav') ||
+      document.querySelector('[class*="panelList"]') ||
+      document.querySelector('nav');
 
     const CSS = [
-      /* 折叠：隐藏左侧栏的「全局面板」列表（就是那个 nav）。
-         注意 slot 座位属性是按面板项逐项渲染的，不能用它匹配整列。 */
-      'body[data-dsh-panellist-collapsed] nav[role="navigation"],',
-      'body[data-dsh-panellist-collapsed] [class*="panelList"] { display: none !important; }',
-      /* 按钮外观：尺寸用内联样式兜底（宿主对 footer button 有更具体的规则），
-         这里只放内联表达不了的交互态。 */
-      '.dsh-panellist-collapse-button:hover { opacity: 1 !important; background: color-mix(in srgb, currentColor 14%, transparent) !important; }',
-      '.dsh-panellist-collapse-button:active { opacity: 1 !important; background: color-mix(in srgb, currentColor 22%, transparent) !important; }',
-      '.dsh-panellist-collapse-button:focus-visible { outline: 2px solid color-mix(in srgb, currentColor 45%, transparent); outline-offset: 2px; }',
+      /* 折叠：只收高度，保留列表自身的 margin-top（皮肤动图舞台靠它撑开）。 */
+      'body[data-dsh-panellist-collapsed] [class*="panelList"],',
+      'body[data-dsh-panellist-collapsed] [data-dsh-surface="sidebar"] nav {',
+      '  height: 0 !important; min-height: 0 !important; max-height: 0 !important;',
+      '  padding-top: 0 !important; padding-bottom: 0 !important;',
+      '  margin-bottom: 0 !important; border: 0 !important; overflow: hidden !important;',
+      '}',
+      /* 折叠条：高度/尺寸用内联样式，这里只放交互态。 */
+      '.' + BUTTON_CLASS + ':hover { opacity: 1 !important; background: color-mix(in srgb, currentColor 12%, transparent) !important; }',
+      '.' + BUTTON_CLASS + ':active { background: color-mix(in srgb, currentColor 22%, transparent) !important; }',
+      '.' + BUTTON_CLASS + ':focus-visible { outline: 2px solid color-mix(in srgb, currentColor 45%, transparent); outline-offset: 2px; }',
     ].join('\n');
 
-    const BUTTON_STYLE = {
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: 28,
-      height: 28,
-      padding: 0,
-      border: 0,
-      borderRadius: 8,
-      background: 'transparent',
-      color: 'inherit',
-      cursor: 'pointer',
-      opacity: 0.68,
-      transition: 'background-color .15s ease, opacity .15s ease',
-    };
-    const CELL_STYLE = {
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flex: '0 0 auto',
-      width: 36,
-      height: 36,
-    };
-
     return {
-      inject: ['slots', 'locale'],
+      inject: ['locale'],
       apply(ctx) {
         /* 1) 字典：中文/英文各注册一次，其余语言走回退。 */
         ctx.effect(() => {
@@ -84,7 +64,7 @@ window.__ModuleLoader__.load({
           return () => { for (const off of disposers) off(); };
         }, 'panellist-collapse.locale');
 
-        /* 2) 样式表：折叠规则 + 按钮外观。 */
+        /* 2) 样式表：折叠规则 + 折叠条交互态。 */
         ctx.effect(() => {
           const style = document.createElement('style');
           style.setAttribute('data-dsh-panellist-collapse', '');
@@ -93,68 +73,89 @@ window.__ModuleLoader__.load({
           return () => style.remove();
         }, 'panellist-collapse.style');
 
-        /* 3) 把折叠状态投射到 body 属性上，并随状态变化保持同步。 */
-        ctx.effect(() => {
-          const syncBody = () => {
-            const body = document.body;
-            if (!body) return;
-            if (readCollapsed()) body.setAttribute(BODY_ATTR, '');
-            else body.removeAttribute(BODY_ATTR);
-          };
-          syncBody();
-          listeners.add(syncBody);
-          return () => listeners.delete(syncBody);
-        }, 'panellist-collapse.body-attribute');
+        /* 3) 折叠条 DOM（插在 nav 与工作区之间；不依赖任何 slot，因为「工作区之上」没有官方槽位）。 */
+        const row = document.createElement('div');
+        row.className = ROW_CLASS;
+        row.style.cssText = 'display:flex;align-items:center;justify-content:center;height:22px;flex:0 0 auto;position:relative;z-index:2;';
 
-        const isChinese = () => String(ctx.locale.getLocale().active || '').toLowerCase().startsWith('zh');
-        const fallbackLabel = (collapsed) => (isChinese()
-          ? (collapsed ? DICTS.zh.expand : DICTS.zh.collapse)
-          : (collapsed ? DICTS.en.expand : DICTS.en.collapse));
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = BUTTON_CLASS;
+        button.style.cssText = [
+          'display:inline-flex', 'align-items:center', 'justify-content:center',
+          'width:32px', 'height:18px', 'padding:0', 'border:0', 'border-radius:6px',
+          'background:transparent', 'color:inherit', 'cursor:pointer', 'opacity:.55',
+          'transition:background-color .15s ease, opacity .15s ease',
+        ].join(';');
 
-        function ToggleButton() {
-          const [collapsed, setCollapsed] = React.useState(readCollapsed);
-          const [, bumpLocale] = React.useState(0);
+        const svg = document.createElementNS(SVG_NS, 'svg');
+        svg.setAttribute('viewBox', '0 0 16 16');
+        svg.setAttribute('width', '14');
+        svg.setAttribute('height', '14');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '1.6');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.setAttribute('aria-hidden', 'true');
+        const svgPath = document.createElementNS(SVG_NS, 'path');
+        svg.append(svgPath);
+        button.append(svg);
+        row.append(button);
 
-          React.useEffect(() => {
-            const onState = () => setCollapsed(readCollapsed());
-            const onLocale = () => bumpLocale((n) => n + 1);
-            listeners.add(onState);
-            const unsubscribe = ctx.locale.subscribe(onLocale);
-            return () => { listeners.delete(onState); unsubscribe(); };
-          }, []);
-
+        const t = (collapsed) => {
           const key = collapsed ? 'expand' : 'collapse';
           const translated = ctx.locale.bind(NS)(key);
-          const label = translated && translated !== key ? translated : fallbackLabel(collapsed);
+          if (translated && translated !== key) return translated;
+          const chinese = String(ctx.locale.getLocale().active || '').toLowerCase().startsWith('zh');
+          return chinese ? DICTS.zh[key] : DICTS.en[key];
+        };
 
-          return h('span', { className: 'dsh-panellist-collapse-cell', style: CELL_STYLE },
-            h('button', {
-              type: 'button',
-              className: 'dsh-panellist-collapse-button',
-              style: BUTTON_STYLE,
-              title: label,
-              'aria-label': label,
-              'aria-expanded': collapsed ? 'false' : 'true',
-              onClick: () => { writeCollapsed(!readCollapsed()); notify(); },
-            }, h('svg', {
-              viewBox: '0 0 16 16',
-              width: 16,
-              height: 16,
-              fill: 'none',
-              stroke: 'currentColor',
-              strokeWidth: 1.6,
-              strokeLinecap: 'round',
-              strokeLinejoin: 'round',
-              'aria-hidden': true,
-            }, h('path', { d: collapsed ? 'M3.5 6 8 10.5 12.5 6' : 'M3.5 10 8 5.5 12.5 10' }))));
-        }
+        const render = () => {
+          const collapsed = readCollapsed();
+          if (collapsed) document.body.setAttribute(BODY_ATTR, '');
+          else document.body.removeAttribute(BODY_ATTR);
+          const label = t(collapsed);
+          button.title = label;
+          button.setAttribute('aria-label', label);
+          button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+          svgPath.setAttribute('d', collapsed ? 'M3.5 6 8 10.5 12.5 6' : 'M3.5 10 8 5.5 12.5 10');
+        };
 
-        /* 4) 挂到侧栏底部的官方扩展位（replaceRisk: none，不替换任何内置项）。 */
-        ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-          name: 'sidebar.footer.action',
-          id: 'panellist-collapse',
-          order: -10,
-        }, ToggleButton));
+        /* 4) 把折叠条维持在 nav 之后；宿主重渲染后自动补回。 */
+        let observer = null;
+        const ensureAttached = () => {
+          const nav = findNav();
+          if (!nav || !nav.parentElement) {
+            if (row.isConnected) row.remove();
+            return;
+          }
+          if (row.parentElement !== nav.parentElement || row.previousElementSibling !== nav) {
+            nav.insertAdjacentElement('afterend', row);
+          }
+          /* 侧栏收成窄条（rail）时列表不可见，折叠条也隐藏。 */
+          row.style.display = nav.offsetWidth > 40 ? 'flex' : 'none';
+        };
+
+        button.addEventListener('click', () => {
+          writeCollapsed(!readCollapsed());
+          render();
+        });
+
+        render();
+        ensureAttached();
+        observer = new MutationObserver(() => ensureAttached());
+        observer.observe(document.body, { childList: true, subtree: true });
+        window.addEventListener('resize', ensureAttached);
+        const unsubscribeLocale = ctx.locale.subscribe(() => render());
+
+        ctx.effect(() => () => {
+          if (observer) observer.disconnect();
+          window.removeEventListener('resize', ensureAttached);
+          unsubscribeLocale();
+          row.remove();
+          document.body.removeAttribute(BODY_ATTR);
+        }, 'panellist-collapse.dom');
       },
     };
   },

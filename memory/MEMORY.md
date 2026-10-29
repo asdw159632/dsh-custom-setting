@@ -391,8 +391,8 @@
 ## 13. 侧栏「全局面板」折叠插件与 UI 插件开发路径（2026-10-29）
 
 > 需求目录 `mods/sidebar-panellist-collapse/`，日志 `logs/2026-10-29-sidebar-panellist-collapse.md`。
-> 一句话：**在侧栏底部官方扩展位 `sidebar.footer.action` 加一个按钮，折叠 `nav[role="navigation"]`
-> 的「全局面板」列表，状态存 localStorage。**
+> 一句话：**在面板列表与「工作区」之间插一条折叠条；折叠只收列表高度、保留列表自身的
+> `margin-top`（皮肤动图舞台靠它撑开，所以动图不动），状态存 localStorage。**
 
 * **UI 结构（0.2.1-rc.3 + `orca-link` 皮肤实测）**：
   * 「全局面板」列表 = 侧栏 `nav`（`role="navigation"`，名「全局面板」），内容是 slot
@@ -401,10 +401,14 @@
     折叠整列要命中 `nav[role="navigation"]`，兜底 `[class*="panelList"]`
     （宿主类名 = hash 前缀 + 语义名，如 `wtg9ga_panelList`，**不能写死 hash**）；
   * 侧栏底部官方扩展位 = slot **`sidebar.footer.action`**（`replaceRisk: none`，`ownerProps: { wide }`），
-    内置 occupant：update / remote-bridge / cordis-panel / remote-web-ui；
+    内置 occupant：update / remote-bridge / cordis-panel / remote-web-ui；**本项目最终没用它**：
+    用户要求按钮在「工作区」之上，而那个位置没有官方 slot ⇒ 用 DOM 注入 + `MutationObserver` 维持；
   * 皮肤 `orca-link` 是**纯资产目录**（`~\.dsh\skins\orca-link\`：`skin.json` / `skin.css` / `patches.css` /
     `hooks.mjs` / `assets/`），由 profile 里的 `dsh-client-ui-skin-center` 加载；它的角色动图是 hooks
-    注入的**绝对定位覆盖层**，不在布局流里（所以列表收起后动图会叠到工作区顶部）。
+    注入的**绝对定位覆盖层**；**动图舞台的留白 = 面板列表自身的 `margin-top`**
+    （`patches.css`：`margin-top: calc(var(--orca-stage,300px) - 116px)`）⇒ 折叠列表时**不能**用
+    `display:none`（会连 margin 一起删掉 → 舞台塌陷 → 工作区盖住动图），必须只收高度
+    （`height:0` + `overflow:hidden`，margin 保留）。
 * **本地 UI 插件（bundle）开发路径**（走 `cordis-plugin-development` skill）：
   1. workspace 建目录：`package.json`（`dsh.bundle.patch` + `dsh.client:{platform:'web',immediately:true,inject:[所属 UI 包]}`）
      + `cordis.patch.yml`（insert 一行）+ `index.js`（Host 半区，可空）+ `client.js`
@@ -415,11 +419,13 @@
   4. 验证：host `Config.listConfigs` 查 `include:<id>`（无 Config 的插件 `status: absent` 属正常）；
      client `Slots.listSubTree root=<slot>` 看 occupant（active/order）；浏览器 `navigate + screenshot` 看实际效果
      （snapshot 过大时会落到 spill 文件，用 grep 找节点）。
-* **两个坑**：① 宿主对 footer `button` 有更具体的 CSS → 纯 class 的 `width/height` 会被覆盖（按钮被拉成整行、
-  换行到图标行之上），要用**内联 style** + 单元格 `flex: 0 0 auto`；② slot 的 `data-slot` 座位粒度可能是
-  「逐项」而不是「整列」，选中目标前先看实际 DOM 盒。
-* 已知外观：折叠后皮肤动图（绝对定位）会叠在工作区上方；要「连动图一起收起」得加皮肤内部选择器
-  （依赖皮肤结构，皮肤更新可能失效），按需再做。
+* **三个坑**：① 宿主对 footer `button` 有更具体的 CSS → 纯 class 的 `width/height` 会被覆盖，要用**内联 style**
+  （需要留在某行里时再加 `flex: 0 0 auto`）；② slot 的 `data-slot` 座位粒度可能是「逐项」而不是「整列」
+  （`sidebar.panellist` 就是逐项的），选中目标前先看实际 DOM 盒；③ **`nav[role="navigation"]` 匹配不到**
+  ——`navigation` 是 `<nav>` 的隐式角色、不是属性，选择器要用 `[class*="panelList"]`
+  （宿主类名 = hash 前缀 + 语义名）或 `[data-dsh-surface="sidebar"] nav`。
+* 依赖宿主 DOM 语义选择器（`[class*="panelList"]` / `[data-dsh-surface="sidebar"]` / `nav`）；宿主大改侧栏
+  结构时要跟着调一行。注入的折叠条用 `MutationObserver` 在宿主重渲染后自动补回。
 
 ---
 
@@ -445,3 +451,4 @@
 | 2026-10-29 | 新增 §12：新建**「助手标准模式」**（preset `standard-assistant`）= 标准模式 plugins 逐字复制 + 人设段换成 `You are a helpful software engineer assistant.`。关键机制：`ctx.systemPrompt.section()` 的**同名遮蔽** + 自定 `order`，把 `deployment:persona-prefix` 注册到 −2000 排到 `harness:identity`(−1000) 之前，成为系统提示词第一项（其余 16 段顺序与标准模式一致、30 工具一致）。本地插件行 `./x.mjs` 锚定 profile 目录，install 需复制插件且先放插件后写 patch。已实装 desktop profile，活宿主 6 行预设。需求目录 `mods/agent-preset-standard-assistant/`。 |
 | 2026-10-29 | 把新建的「助手标准模式」**改名为「标·准· 模式」**（preset id standard-assistant 不变，托管块标记去掉显示名）。同日用户在 desktop profile 装了通知插件 dsh-notify-me@1.17.0（另把 dsh-web-all/better-sidebar/dshmarket/dsh-meme 一并升级/新增）。 |
 | 2026-10-29 | 新增 §13：新建本地 UI 插件 **`@local/dsh-panellist-collapse`**（需求目录 `mods/sidebar-panellist-collapse/`）：在侧栏底部 `sidebar.footer.action` 加折叠按钮，折叠 `nav[role="navigation"]` 的「全局面板」列表，状态存 `localStorage`；实测折叠/展开/刷新持久均通过。同时记录本地 bundle 的开发-安装-验证路径与两个坑（宿主 CSS 覆盖按钮尺寸、`data-slot` 是逐项座位）。 |
+| 2026-10-29 | §13 修订（v2，按用户反馈）：折叠条从侧栏底部移到「面板列表与工作区之间」（该位置无官方 slot ⇒ DOM 注入 + `MutationObserver`）；折叠改为只收高度、**保留列表自身的 `margin-top`**——皮肤 `orca-link` 的动图舞台正是靠这条 margin 撑开的，用 `display:none` 会塌掉，现在**动图完全不动**；并修掉 `nav[role=navigation]` 选择器失效（`navigation` 是隐式角色）改用 `[class*="panelList"]`。 |

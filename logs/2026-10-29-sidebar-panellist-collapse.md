@@ -67,3 +67,25 @@ profile：`desktop`
 * 皮肤更新不影响本插件（不依赖皮肤内部类名；折叠目标用的是角色的语义选择器）。
 * 若以后面板列表的 `nav` 结构变化（例如改成别的标签），fallback 选择器是
   `[class*="panelList"]`，届时按新结构再调一行 CSS 即可。
+
+## 7. 2026-10-29 修订 v2（按用户反馈）
+
+用户反馈两点：① 折叠按钮在最下面、离列表太远，应在「工作区」之上；② 折叠时把动图也收回去了，动图不许动。
+
+排查结论（读 `~/.dsh/skins/orca-link/patches.css`）：
+* 动图舞台不是独立留白，而是**面板列表自身的 margin-top** 撑出来的：
+  `body[data-orca-sidebar-wide] [data-surface=sidebar] > :first-child > nav { margin-top: calc(var(--orca-stage, 300px) - 116px) }`。
+  v1 用 `display:none` 折叠，把这条 margin 一起删掉 → 动图舞台塌陷、工作区上移盖住动图。
+* 该位置**没有官方 slot**（「工作区之上」不在 slot 目录里），所以按钮改为 DOM 注入一条很薄的折叠条，
+  插在列表之后、工作区之前，用 `MutationObserver` 在宿主重渲染后补回。
+
+改法：
+1. 折叠样式改为 `height/min-height/max-height: 0` + `overflow:hidden`，**保留 margin-top** ⇒ 动图不动，
+   工作区停在动图下方（实测折叠后工作区标题在 y≈320，动图仍在 y≈50–250，不重叠）。
+2. 按钮从 `sidebar.footer.action` 移除，改为列表后的 22px 折叠条（居中 14px 箭头，tooltip 中英）。
+3. 修选择器：`nav[role="navigation"]` 匹配不到（role 是 `<nav>` 的隐式角色，不是属性），
+   改用实际存在的 `[class*="panelList"]`，`findNav()` 兜底 `[data-dsh-surface="sidebar"] nav`。
+4. 折叠条随列表宽度自适应：侧栏收成窄条（列表不可见）时自动隐藏。
+
+实测（浏览器 127.0.0.1:1344）：折叠条位于「更多」与「工作区」之间；折叠后 7 行面板项消失、
+动图位置不变、工作区上移但不遮动图；再点恢复；刷新保持；控制台无报错。
