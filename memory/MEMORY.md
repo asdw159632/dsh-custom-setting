@@ -322,6 +322,46 @@
 * ⚠️ **并发会话教训**：本模式的文件曾被同工作区另一会话（`mods/dsh-command-desktop`）的仓库级 `git add`
   卷进它的提交 `4ed60e8`（内容无损，blob 一致）。多会话并行时**提交前先 `git status -uall`，按路径 add，不要 `-A`**。
 
+## 11. 系统提示词装配与「极简 vs 标准」实测差异（2026-10-29）
+
+> 详见 `logs/2026-10-29-preset-prompt-compare.md`、探针 `tmp/prompt-compare/probe-system-prompt.mjs`。
+> 一句话：**极简模式用 persona `complete: true` 把整份系统提示词压成一句话（46 字符）+
+> 3 个工具；标准模式 20 段（17 非空，5347 字符）+ 30 个工具 + 6 类运行时上下文。**
+
+* **⚠️ 宿主已升级到 0.2.1-rc.3，安装路径全变**（§4/§5 里记的 `D:\software\DSH` 已失效，以本节为准）：
+  旧路径不存在，现在是 `D:\software\DeepseekHarness\desktop\resources\app.asar`；自带 CLI =
+  `D:\software\DeepseekHarness\desktop\resources\runtime\cli\bin\dsh.cmd`（`--version` = 0.2.1-rc.3，
+  `D:\software\DeepseekHarness\node_modules` 那套仍是旧的 0.1.0-rc.8，勿混）；GUI 仍监听 `127.0.0.1:19387`，
+  `~/.dsh` 未变。旧脚本/文档里写死的 `D:\software\DSH\...` 都要按新路径替换。
+* **系统提示词装配入口**：`ctx.systemPrompt.assemble({ scope })`（`@deepseek-ai/dsh-system-prompt`），
+  返回 `{ sections, contexts, tools, variables }`；`scope` 取 `agentPresets.acquireScope(presetId).key`。
+  四类输入：段（拼成文本，按 order 升序）、**动态上下文（不进系统提示词文本，是带来源的 user 角色快照）**、
+  工具 schema、变量（`{{model}}` 等）。渲染用 `renderPrompt()` / `renderContextSnapshot()`。
+  ⇒ **任何 preset 都能在 profile 层探针里直接装配，不必改 preset 本身**。
+* **不进系统提示词的三条消息通道**（标准模式才有；极简不挂这些行）：
+  ① AGENTS.md（`dsh-agent-instructions`，`<system-reminder>` 包裹的 **user 消息**，上限 64 KB）；
+  ② 技能目录（`dsh-skill-filesystem` + `dsh-tool-skill`，`<available_skills>` 提醒）；
+  ③ 时间行（`dsh-time-context`，每步 `Time sampled while preparing turn N, step M: …`）。
+* **实测差异（干净 web 模板 profile，0.2.1-rc.3）**：
+  * standard：20 段（17 非空，**5347 字符 / 33 行**）= `harness:identity` + persona 前缀 +
+    `plan:policy`（plan 关闭时为空）+ 13 个 `tool:*` 工具用法段 + `ui:deliverable-file-references`
+    + `harness:source` + `app:web-surface` + 空 persona 后缀；工具 **30 个**；可选上下文 6 类
+    （cwd / sandbox / approval / 委派深度 / checkout / GUI URL）。
+  * minimal：**1 段 46 字符**（`You are a helpful software engineer assistant.`）；工具 **3 个**
+    （`pwsh`、`read_image`、`working_directory`）；上下文只剩**必需**的 cwd。
+  * 根因：minimal 的 persona `complete: true`（组装仍求值上下文/工具/变量，但最终只保留 persona
+    前缀段，身份/后缀/工具引导/监听器都写不进去）+ `includeRuntimeContext: false`
+    （调 `suppressRuntimeContext()`，只压**可选**上下文，标记 required 的仍保留，例如 cwd）。
+    standard 的 persona 前缀与部署级默认值（`dsh-system-prompt.config.personaPrefix`）逐字相同，
+    等于没改身份。
+* **`dsh-tool-fs` 已有按工具开关**（`read`/`readImage`/`write`/`edit`）：minimal 用
+  `read:false, readImage:true, write:false, edit:false` ⇒ 只拿 `read_image`。
+  **0.2.0-rc.2 时代「read_image 只能整组加」的结论在 0.2.1-rc.3 已不成立**
+  （`mods/agent-preset-custom` 当时据此把 read/write/edit 一起加了；要收窄可改开关式）。
+* **复现方法**：`tmp/prompt-compare/probe-system-prompt.mjs` 挂进临时 profile（profile patch 里
+  `- insert:` 一行 `name: './probe-system-prompt.mjs'`，config 给 `presetIds` / `outDir` / `delayMs`）
+  → 起临时实例 → 读 `out/<preset>.json`。`--dump-config` 只能看组合，看不到装配后的文本。
+
 ---
 
 ## 变更记录
@@ -342,3 +382,4 @@
 | 2026-10-14 | 新增 §8：WSL 可用性 A/B 实测——沙箱会话（read-only/workspace-write）里 `wsl.exe` 被拒（`Wsl/E_ACCESSDENIED`），`danger-full-access` 下正常；工作区 = `/mnt/d/文档/DSH-plugin/DSH-custom`；无官方「切 WSL」开关，可行路线 A/B/C/D 见 `mods/wsl-execution/`。 |
 | 2026-10-14 | 新增 §9：PowerShell 的 `dsh` = npm 全局 shim → 旧 CLI **0.1.0-rc.8**；桌面端自带 **0.2.0-rc.2** 的 `dsh.cmd` 且有官方接管机制（用户 PATH 首位 + `HKCU\Software\DeepSeekHarness\Command` 归属键），**从未安装**。入口在 preload 自绘标题栏的「应用」按钮 →「管理 dsh 命令…」。实测 PowerShell 解析**目录优先级 > 扩展名优先级**（只有 `dsh.cmd` 也能压过 `dsh.ps1`）。desktop profile 被 Electron 独占，CLI 不能 boot。沙箱内装不了（HKCU 拒写 / spawn EPERM）。需求目录 `mods/dsh-command-desktop/`（含只读校验 `verify.ps1`），日志 `logs/2026-10-14-dsh-command-desktop.md`。**待用户点 GUI 安装**。 |
 | 2026-10-15 | 新增 §10：把 WSL 侧的**「定制模式」**（preset `custom` = 极简 + `tool-fs` + `tool-ask-user`）复刻到 Windows 桌面客户端并实装进 desktop profile。同一份 patch 在 Windows 上工具名是 `pwsh`（Linux 是 `bash`）；实测 6 工具（模板 profile）/ 23 工具（真实 profile 副本，含第三方 task-board 的 17 个）。活宿主 inspect 安装后 5 行（多出 `include:preset-custom`）⇒ 热加载。需求目录 `mods/agent-preset-custom/`，日志 `logs/2026-10-15-agent-preset-custom-windows.md`。 |
+| 2026-10-29 | 新增 §11：用探针 `ctx.systemPrompt.assemble({scope})` 实测**极简 vs 标准**的系统提示词差异（宿主已升到 **0.2.1-rc.3**）：极简 = 1 段 46 字符 + 3 工具（`complete:true` 压掉其余一切，可选上下文也抑制），标准 = 20 段/5347 字符 + 30 工具 + 6 类上下文；AGENTS.md / 技能目录 / 时间行走「消息通道」而非系统提示词。同时记录：安装路径改为 `D:\software\DeepseekHarness\desktop\resources\app.asar`（旧 `D:\software\DSH` 已删）、`dsh-tool-fs` 新增 read/readImage/write/edit 开关（旧结论「read_image 只能整组加」已过时）。日志 `logs/2026-10-29-preset-prompt-compare.md`。 |
