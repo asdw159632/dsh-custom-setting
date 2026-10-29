@@ -14,7 +14,8 @@
 | --- | --- |
 | 面板列表是什么 | 侧栏的 `nav`（class `*_panelList`，无障碍名「全局面板」），内容是 slot `sidebar.panellist` 的 7 个面板项 |
 | 折叠条位置 | 插在**面板列表之后、工作区之前**（面板列表底边下方）。这个位置没有官方槽位，所以用 DOM 插入 + `MutationObserver` 保持（宿主重渲染后自动补回） |
-| 折叠做了什么 | 把列表的 `height/min-height/max-height` 收成 0、`overflow:hidden`——**只收高度，保留列表自身的 `margin-top`** |
+| 折叠做了什么 | **只保留列表前 `KEEP_ROWS` 行**（默认 1 行 = 只留「插件」按钮），其余行隐藏；列表容器与它的 `margin-top` 完全不动 |
+| 想只留几个按钮 | 改 `client.js` 顶部 `const KEEP_ROWS = 1;`：1 = 只留「插件」；2 = 插件 + 任务看板；3 = 再加技能中心…… 刷新页面即生效 |
 | 为什么保留 margin（关键） | `orca-link` 皮肤的动图舞台就是靠列表的 `margin-top: calc(var(--orca-stage) - 116px)` 撑出来的；用 `display:none` 会连这条 margin 一起删掉 → 动图舞台塌掉、工作区顶上去盖住动图。所以折叠只收高度，**动图位置完全不变** |
 | 状态 | 存 `localStorage['dsh.panellist.collapsed']`，刷新/重启保持 |
 | 文案 | Client locale 服务注册 zh / en；tooltip「收起面板列表 / 展开面板列表」 |
@@ -45,7 +46,7 @@ plugin_manager remove_bundle target="@local/dsh-panellist-collapse"
 1. `plugin_manager install_bundle` → `application: applied`、`warnings: []`（Host 组合出现 `include:panellist-collapse`）。
 2. 浏览器实测（`http://127.0.0.1:1344`）：
    * 折叠条在「更多」行下方、工作区标题上方，居中一个小箭头；
-   * 点击折叠：面板列表 7 行消失，**动图停在原处不动**，工作区上移到动图下方（不再叠在动图上）；
+   * 点击折叠：只保留「插件」一行（其余 6 行隐藏），**动图停在原处不动**，工作区紧接在该行下方；
    * 再点展开：完全恢复原布局；
    * 折叠状态刷新后保持；控制台无本插件报错。
 
@@ -74,3 +75,4 @@ plugin_manager remove_bundle target="@local/dsh-panellist-collapse"
 | --- | --- |
 | 2026-10-29 | 建立 v1：按钮挂侧栏底部扩展位，`display:none` 折叠列表。 |
 | 2026-10-29 | v2（按用户反馈）：折叠条移到「面板列表与工作区之间」；折叠改为只收高度、保留列表 `margin-top`，动图位置不再受影响；修掉 `nav[role=navigation]` 选择器失效、改用 `[class*="panelList"]`；加 `MutationObserver` 维持注入节点。实测折叠/展开/动图不动均通过。 |
+| 2026-10-29 | v3：折叠从「整列收掉」改为「**保留前 `KEEP_ROWS` 行**」——默认 1 行 = 只留「插件」按钮，调大常量即可只留少数几个按钮。实测折叠后只剩「插件」行、动图不动、工作区紧接其下。 |

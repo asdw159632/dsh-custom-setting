@@ -391,24 +391,25 @@
 ## 13. 侧栏「全局面板」折叠插件与 UI 插件开发路径（2026-10-29）
 
 > 需求目录 `mods/sidebar-panellist-collapse/`，日志 `logs/2026-10-29-sidebar-panellist-collapse.md`。
-> 一句话：**在面板列表与「工作区」之间插一条折叠条；折叠只收列表高度、保留列表自身的
-> `margin-top`（皮肤动图舞台靠它撑开，所以动图不动），状态存 localStorage。**
+> 一句话：**在面板列表与「工作区」之间插一条折叠条；折叠时只保留列表前 `KEEP_ROWS` 行
+> （默认 1 行 = 只留「插件」按钮），容器与它的 `margin-top` 都不动（皮肤动图舞台靠它撑开，
+> 所以动图不动），状态存 localStorage。**
 
 * **UI 结构（0.2.1-rc.3 + `orca-link` 皮肤实测）**：
   * 「全局面板」列表 = 侧栏 `nav`（`role="navigation"`，名「全局面板」），内容是 slot
     **`sidebar.panellist`** 的 occupant：plugins / schedules / task-board / skill-explorer / agents / git / ssh；
-  * `sidebar.panellist` 的 **`data-slot` 座位是逐面板项渲染的**（隐藏它只掉图标、文字还在），
-    折叠整列要命中 `nav[role="navigation"]`，兜底 `[class*="panelList"]`
-    （宿主类名 = hash 前缀 + 语义名，如 `wtg9ga_panelList`，**不能写死 hash**）；
+  * `sidebar.panellist` 的 **`data-slot` 座位是逐面板项渲染的**（隐藏它只掉图标、文字还在）；
+    折叠 = 隐藏列表里的多余行、**保留前 `KEEP_ROWS` 行**（默认 1 = 只留「插件」按钮），
+    目标用 `[class*="panelList"]`（宿主类名 = hash 前缀 + 语义名，如 `wtg9ga_panelList`，**不能写死 hash**）；
   * 侧栏底部官方扩展位 = slot **`sidebar.footer.action`**（`replaceRisk: none`，`ownerProps: { wide }`），
     内置 occupant：update / remote-bridge / cordis-panel / remote-web-ui；**本项目最终没用它**：
     用户要求按钮在「工作区」之上，而那个位置没有官方 slot ⇒ 用 DOM 注入 + `MutationObserver` 维持；
   * 皮肤 `orca-link` 是**纯资产目录**（`~\.dsh\skins\orca-link\`：`skin.json` / `skin.css` / `patches.css` /
     `hooks.mjs` / `assets/`），由 profile 里的 `dsh-client-ui-skin-center` 加载；它的角色动图是 hooks
     注入的**绝对定位覆盖层**；**动图舞台的留白 = 面板列表自身的 `margin-top`**
-    （`patches.css`：`margin-top: calc(var(--orca-stage,300px) - 116px)`）⇒ 折叠列表时**不能**用
-    `display:none`（会连 margin 一起删掉 → 舞台塌陷 → 工作区盖住动图），必须只收高度
-    （`height:0` + `overflow:hidden`，margin 保留）。
+    （`patches.css`：`margin-top: calc(var(--orca-stage,300px) - 116px)`）⇒ 折叠时**不能**用
+    `display:none` 收整列（会连 margin 一起删掉 → 舞台塌陷 → 工作区盖住动图），只能隐藏
+    多余的行、保留容器与 margin（默认只留「插件」行；想多留几行改 `client.js` 顶部 `KEEP_ROWS`）。
 * **本地 UI 插件（bundle）开发路径**（走 `cordis-plugin-development` skill）：
   1. workspace 建目录：`package.json`（`dsh.bundle.patch` + `dsh.client:{platform:'web',immediately:true,inject:[所属 UI 包]}`）
      + `cordis.patch.yml`（insert 一行）+ `index.js`（Host 半区，可空）+ `client.js`
@@ -452,3 +453,4 @@
 | 2026-10-29 | 把新建的「助手标准模式」**改名为「标·准· 模式」**（preset id standard-assistant 不变，托管块标记去掉显示名）。同日用户在 desktop profile 装了通知插件 dsh-notify-me@1.17.0（另把 dsh-web-all/better-sidebar/dshmarket/dsh-meme 一并升级/新增）。 |
 | 2026-10-29 | 新增 §13：新建本地 UI 插件 **`@local/dsh-panellist-collapse`**（需求目录 `mods/sidebar-panellist-collapse/`）：在侧栏底部 `sidebar.footer.action` 加折叠按钮，折叠 `nav[role="navigation"]` 的「全局面板」列表，状态存 `localStorage`；实测折叠/展开/刷新持久均通过。同时记录本地 bundle 的开发-安装-验证路径与两个坑（宿主 CSS 覆盖按钮尺寸、`data-slot` 是逐项座位）。 |
 | 2026-10-29 | §13 修订（v2，按用户反馈）：折叠条从侧栏底部移到「面板列表与工作区之间」（该位置无官方 slot ⇒ DOM 注入 + `MutationObserver`）；折叠改为只收高度、**保留列表自身的 `margin-top`**——皮肤 `orca-link` 的动图舞台正是靠这条 margin 撑开的，用 `display:none` 会塌掉，现在**动图完全不动**；并修掉 `nav[role=navigation]` 选择器失效（`navigation` 是隐式角色）改用 `[class*="panelList"]`。 |
+| 2026-10-29 | §13 修订（v3，按用户反馈）：折叠从「整列收掉」改为「**保留前 `KEEP_ROWS` 行**」（默认 1 行 = 只留「插件」按钮，其余行隐藏；想只留少数几个按钮就调大这个常量），容器与 `margin-top` 仍不动。实测折叠后只显示「插件」行、动图不动、工作区紧接其下。 |

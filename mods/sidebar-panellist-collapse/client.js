@@ -1,15 +1,16 @@
 /**
  * sidebar-panellist-collapse —— 左侧栏「全局面板列表」的展开 / 收起控制。
  *
- * 位置：按钮插在面板列表（`nav[role="navigation"]`）之后、工作区之前，作为一条很薄的折叠条。
- * 折叠行为：只把列表的**高度**收掉，保留它自己的 `margin-top`。
+ * 位置：折叠条插在面板列表之后、工作区之前，是一条很薄的条。
+ * 折叠行为：**只保留列表的前 KEEP_ROWS 行**（默认 1 行 = 只留「插件」按钮），其余行隐藏；
+ *   列表容器本身与它的 `margin-top` 都不动。
  *
- * 为什么不能用 display:none（重要）：
+ * 为什么不能直接 display:none 整列（重要）：
  *   orca-link 皮肤的动图舞台是靠面板列表自身的 margin-top 撑出来的
  *   （patches.css: `[data-surface=sidebar] > :first-child > nav { margin-top:
- *   calc(var(--orca-stage, 300px) - 116px) }`）。`display:none` 会把这条 margin 一起
- *   去掉，动图的舞台就塌了、工作区顶上来盖住动图。所以这里用 height: 0 + overflow: hidden，
- *   margin 保留 → 动图位置完全不变，工作区停在动图下方。
+ *   calc(var(--orca-stage, 300px) - 116px) }`）。把列表（或它的 margin）去掉，动图的
+ *   舞台就塌了、工作区顶上来盖住动图。所以只隐藏多余的行，容器与 margin 全部保留
+ *   → 动图位置完全不变，工作区停在动图下方。
  *
  * 状态存在 localStorage，刷新/重启保持；文案走 Client locale（zh/en + 当前语言兜底）。
  */
@@ -40,13 +41,15 @@ window.__ModuleLoader__.load({
       document.querySelector('[class*="panelList"]') ||
       document.querySelector('nav');
 
+    /* 折叠时保留的面板行数：1 = 只留「插件」这一行；想多留几行（任务看板/技能中心…）就调大。 */
+    const KEEP_ROWS = 1;
+
     const CSS = [
-      /* 折叠：只收高度，保留列表自身的 margin-top（皮肤动图舞台靠它撑开）。 */
-      'body[data-dsh-panellist-collapsed] [class*="panelList"],',
-      'body[data-dsh-panellist-collapsed] [data-dsh-surface="sidebar"] nav {',
-      '  height: 0 !important; min-height: 0 !important; max-height: 0 !important;',
-      '  padding-top: 0 !important; padding-bottom: 0 !important;',
-      '  margin-bottom: 0 !important; border: 0 !important; overflow: hidden !important;',
+      /* 折叠：保留前 KEEP_ROWS 行、隐藏其余行；列表容器与它的 margin-top（皮肤动图舞台的
+         留白）都不动，所以动图位置完全不变。 */
+      'body[data-dsh-panellist-collapsed] [class*="panelList"] > *:nth-child(n + ' + (KEEP_ROWS + 1) + '),',
+      'body[data-dsh-panellist-collapsed] [data-dsh-surface="sidebar"] nav > *:nth-child(n + ' + (KEEP_ROWS + 1) + ') {',
+      '  display: none !important;',
       '}',
       /* 折叠条：高度/尺寸用内联样式，这里只放交互态。 */
       '.' + BUTTON_CLASS + ':hover { opacity: 1 !important; background: color-mix(in srgb, currentColor 12%, transparent) !important; }',
