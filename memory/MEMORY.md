@@ -388,6 +388,39 @@
   插件 `persona-prefix-first.mjs` 落在 profile 目录；活宿主 inspect 安装后 **6 行**
   （standard / ptc / minimal / cordis / custom / standard-assistant）⇒ 热加载成功。
 
+## 13. 侧栏「全局面板」折叠插件与 UI 插件开发路径（2026-10-29）
+
+> 需求目录 `mods/sidebar-panellist-collapse/`，日志 `logs/2026-10-29-sidebar-panellist-collapse.md`。
+> 一句话：**在侧栏底部官方扩展位 `sidebar.footer.action` 加一个按钮，折叠 `nav[role="navigation"]`
+> 的「全局面板」列表，状态存 localStorage。**
+
+* **UI 结构（0.2.1-rc.3 + `orca-link` 皮肤实测）**：
+  * 「全局面板」列表 = 侧栏 `nav`（`role="navigation"`，名「全局面板」），内容是 slot
+    **`sidebar.panellist`** 的 occupant：plugins / schedules / task-board / skill-explorer / agents / git / ssh；
+  * `sidebar.panellist` 的 **`data-slot` 座位是逐面板项渲染的**（隐藏它只掉图标、文字还在），
+    折叠整列要命中 `nav[role="navigation"]`，兜底 `[class*="panelList"]`
+    （宿主类名 = hash 前缀 + 语义名，如 `wtg9ga_panelList`，**不能写死 hash**）；
+  * 侧栏底部官方扩展位 = slot **`sidebar.footer.action`**（`replaceRisk: none`，`ownerProps: { wide }`），
+    内置 occupant：update / remote-bridge / cordis-panel / remote-web-ui；
+  * 皮肤 `orca-link` 是**纯资产目录**（`~\.dsh\skins\orca-link\`：`skin.json` / `skin.css` / `patches.css` /
+    `hooks.mjs` / `assets/`），由 profile 里的 `dsh-client-ui-skin-center` 加载；它的角色动图是 hooks
+    注入的**绝对定位覆盖层**，不在布局流里（所以列表收起后动图会叠到工作区顶部）。
+* **本地 UI 插件（bundle）开发路径**（走 `cordis-plugin-development` skill）：
+  1. workspace 建目录：`package.json`（`dsh.bundle.patch` + `dsh.client:{platform:'web',immediately:true,inject:[所属 UI 包]}`）
+     + `cordis.patch.yml`（insert 一行）+ `index.js`（Host 半区，可空）+ `client.js`
+     （`window.__ModuleLoader__.load({ id, factory(require){ ... return { inject, apply(ctx) } } })`）
+     + `locale/en.json`、`locale/zh.json`（`meta.title` / `meta.description`）+ `icon.svg`；
+  2. `plugin_manager install_bundle target=<绝对目录>` → 看返回的 `application` / `warnings`（本次 applied、无 warning）；
+  3. 本地目录是 **pnpm link**：改 `client.js` 后**刷新页面**即生效，不必重装；
+  4. 验证：host `Config.listConfigs` 查 `include:<id>`（无 Config 的插件 `status: absent` 属正常）；
+     client `Slots.listSubTree root=<slot>` 看 occupant（active/order）；浏览器 `navigate + screenshot` 看实际效果
+     （snapshot 过大时会落到 spill 文件，用 grep 找节点）。
+* **两个坑**：① 宿主对 footer `button` 有更具体的 CSS → 纯 class 的 `width/height` 会被覆盖（按钮被拉成整行、
+  换行到图标行之上），要用**内联 style** + 单元格 `flex: 0 0 auto`；② slot 的 `data-slot` 座位粒度可能是
+  「逐项」而不是「整列」，选中目标前先看实际 DOM 盒。
+* 已知外观：折叠后皮肤动图（绝对定位）会叠在工作区上方；要「连动图一起收起」得加皮肤内部选择器
+  （依赖皮肤结构，皮肤更新可能失效），按需再做。
+
 ---
 
 ## 变更记录
@@ -411,3 +444,4 @@
 | 2026-10-29 | 新增 §11：用探针 `ctx.systemPrompt.assemble({scope})` 实测**极简 vs 标准**的系统提示词差异（宿主已升到 **0.2.1-rc.3**）：极简 = 1 段 46 字符 + 3 工具（`complete:true` 压掉其余一切，可选上下文也抑制），标准 = 20 段/5347 字符 + 30 工具 + 6 类上下文；AGENTS.md / 技能目录 / 时间行走「消息通道」而非系统提示词。同时记录：安装路径改为 `D:\software\DeepseekHarness\desktop\resources\app.asar`（旧 `D:\software\DSH` 已删）、`dsh-tool-fs` 新增 read/readImage/write/edit 开关（旧结论「read_image 只能整组加」已过时）。日志 `logs/2026-10-29-preset-prompt-compare.md`。 |
 | 2026-10-29 | 新增 §12：新建**「助手标准模式」**（preset `standard-assistant`）= 标准模式 plugins 逐字复制 + 人设段换成 `You are a helpful software engineer assistant.`。关键机制：`ctx.systemPrompt.section()` 的**同名遮蔽** + 自定 `order`，把 `deployment:persona-prefix` 注册到 −2000 排到 `harness:identity`(−1000) 之前，成为系统提示词第一项（其余 16 段顺序与标准模式一致、30 工具一致）。本地插件行 `./x.mjs` 锚定 profile 目录，install 需复制插件且先放插件后写 patch。已实装 desktop profile，活宿主 6 行预设。需求目录 `mods/agent-preset-standard-assistant/`。 |
 | 2026-10-29 | 把新建的「助手标准模式」**改名为「标·准· 模式」**（preset id standard-assistant 不变，托管块标记去掉显示名）。同日用户在 desktop profile 装了通知插件 dsh-notify-me@1.17.0（另把 dsh-web-all/better-sidebar/dshmarket/dsh-meme 一并升级/新增）。 |
+| 2026-10-29 | 新增 §13：新建本地 UI 插件 **`@local/dsh-panellist-collapse`**（需求目录 `mods/sidebar-panellist-collapse/`）：在侧栏底部 `sidebar.footer.action` 加折叠按钮，折叠 `nav[role="navigation"]` 的「全局面板」列表，状态存 `localStorage`；实测折叠/展开/刷新持久均通过。同时记录本地 bundle 的开发-安装-验证路径与两个坑（宿主 CSS 覆盖按钮尺寸、`data-slot` 是逐项座位）。 |

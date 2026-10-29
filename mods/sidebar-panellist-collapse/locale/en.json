@@ -1,0 +1,10 @@
+{
+  "meta": {
+    "title": "Panel List Collapse",
+    "description": "Adds an expand/collapse toggle beside the sidebar foot to fold the left sidebar's global panel list."
+  },
+  "action": {
+    "collapse": "Collapse panel list",
+    "expand": "Expand panel list"
+  }
+}

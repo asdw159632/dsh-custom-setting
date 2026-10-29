@@ -27,3 +27,4 @@ mods/
 | 桌面端接管 `dsh` 命令 | `dsh-command-desktop/` | 调研 + 只读校验完成，待用户在 GUI 点「管理 dsh 命令…」安装 |
 | 定制模式（preset `custom`） | `agent-preset-custom/` | 已实装 desktop profile（memory §10） |
 | 标·准· 模式（preset `standard-assistant`） | `agent-preset-standard-assistant/` | 已实装 desktop profile（memory §12） |
+| 侧栏面板列表折叠（插件 `@local/dsh-panellist-collapse`） | `sidebar-panellist-collapse/` | 已安装进 desktop profile（memory §13） |
