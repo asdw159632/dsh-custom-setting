@@ -1,4 +1,4 @@
-# 助手标准模式（agent preset `standard-assistant`）
+# 标·准· 模式（agent preset `standard-assistant`）
 
 需求：**在标准模式基础上新建一个模式，系统提示词以
 `deployment:persona-prefix = "You are a helpful software engineer assistant."` 为第一项开头，
@@ -49,7 +49,7 @@ scoped 段覆盖同名 global 段，并带上自己的 `order`。这里在 prese
 
 | 文件 | 作用 |
 | --- | --- |
-| `standard-assistant.patch.yml` | **唯一的事实来源**：profile patch 片段，`insert` 一条 `@deepseek-ai/dsh-agent-preset` 行（id `standard-assistant`，显示名「助手标准模式」，order 6） |
+| `standard-assistant.patch.yml` | **唯一的事实来源**：profile patch 片段，`insert` 一条 `@deepseek-ai/dsh-agent-preset` 行（id `standard-assistant`，显示名「标·准· 模式」，order 6） |
 | `persona-prefix-first.mjs` | 本地插件：在 preset scope 里注册 `deployment:persona-prefix`（可配 `prefix` / `order` / `sectionName`） |
 | `install.ps1` | 托管块方式装进 profile 的 `cordis.patch.yml`，**并把 `.mjs` 复制到 profile 目录**（幂等、先备份） |
 | `uninstall.ps1` | 摘掉托管块 + 删除插件文件 |
@@ -73,7 +73,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mods\agent-preset-standard-a
 powershell -NoProfile -ExecutionPolicy Bypass -File mods\agent-preset-standard-assistant\uninstall.ps1
 ```
 
-装完（或等宿主热加载）后：新建任务 →「Agent 预设 → 自定义」→ **助手标准模式**。
+装完（或等宿主热加载）后：新建任务 →「Agent 预设 → 自定义」→ **标·准· 模式**。
 
 **本机实装记录（2026-10-29）**：
 
@@ -108,3 +108,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mods\agent-preset-standard-a
 | 日期 | 变更 |
 | --- | --- |
 | 2026-10-29 | 建立：由 `standard.patch.yml` 生成（逐字复制 + 换 persona 行）；新增 `persona-prefix-first.mjs` 用同名遮蔽把 `deployment:persona-prefix` 注册到 order −2000；`verify.ps1` 实测 PASSED（第一项人设段、第二项身份段、30 工具、段序列一致）；实装进 desktop profile，活宿主已见 `include:preset-standard-assistant`。 |
+
+| 2026-10-29 | **改名**：显示名「助手标准模式」→「标·准· 模式」（preset id 不变）；托管块标记改为不含显示名的固定写法 # >>> agent-preset-standard-assistant managed block >>>。 |

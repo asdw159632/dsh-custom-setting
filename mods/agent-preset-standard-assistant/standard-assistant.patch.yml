@@ -1,4 +1,4 @@
-# 助手标准模式（agent preset id: standard-assistant）—— 由「标准模式」派生。
+# 标·准· 模式（agent preset id: standard-assistant）—— 由「标准模式」派生。
 #
 # 与标准模式的唯一差别：系统提示词的**第一项**换成
 #   deployment:persona-prefix = "You are a helpful software engineer assistant."
@@ -22,7 +22,7 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: standard-assistant
-        name: 助手标准模式
+        name: 标·准· 模式
         description: 标准模式的全套提示词与工具；系统提示词第一项换成「You are a helpful software engineer assistant.」（其余段与标准模式一致）。
         order: 6
         plugins:

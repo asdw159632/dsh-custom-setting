@@ -362,7 +362,7 @@
   `- insert:` 一行 `name: './probe-system-prompt.mjs'`，config 给 `presetIds` / `outDir` / `delayMs`）
   → 起临时实例 → 读 `out/<preset>.json`。`--dump-config` 只能看组合，看不到装配后的文本。
 
-## 12. 助手标准模式（agent preset `standard-assistant`，2026-10-29）
+## 12. 标·准· 模式（agent preset `standard-assistant`，原「助手标准模式」，2026-10-29）
 
 > 需求目录 `mods/agent-preset-standard-assistant/`。
 > 一句话：**标准模式的 plugins 逐字复制，只把人设段换成「You are a helpful software engineer assistant.」，
@@ -371,7 +371,7 @@
 * 组成：`@deepseek-ai/dsh-web-app/presets/standard.patch.yml` 的 `plugins` 原样复制，去掉
   `@deepseek-ai/dsh-persona` 行，换成本地插件 `persona-prefix-first.mjs`；其余行
   （agent-instructions / time-context / tool-* / planning / compaction / delegation / skill /
-  goal / web / todo / present …）一字不改。显示名「助手标准模式」，order 6。
+  goal / web / todo / present …）一字不改。显示名「标·准· 模式」（2026-10-29 改名），order 6。
 * **机制（可复用）**：段顺序由段自己的 `order` 决定（`SECTION_ORDERS`：`harness:identity` = −1000、
   内置 persona = 0、PLAN_POLICY = 500、tool 段 1000+）。`ctx.systemPrompt.section()` 支持
   **同名遮蔽**（scoped 段覆盖同名 global 段，且带自己的 order）⇒ **想在标准模式里把某段排到最前/最后，
@@ -410,3 +410,4 @@
 | 2026-10-15 | 新增 §10：把 WSL 侧的**「定制模式」**（preset `custom` = 极简 + `tool-fs` + `tool-ask-user`）复刻到 Windows 桌面客户端并实装进 desktop profile。同一份 patch 在 Windows 上工具名是 `pwsh`（Linux 是 `bash`）；实测 6 工具（模板 profile）/ 23 工具（真实 profile 副本，含第三方 task-board 的 17 个）。活宿主 inspect 安装后 5 行（多出 `include:preset-custom`）⇒ 热加载。需求目录 `mods/agent-preset-custom/`，日志 `logs/2026-10-15-agent-preset-custom-windows.md`。 |
 | 2026-10-29 | 新增 §11：用探针 `ctx.systemPrompt.assemble({scope})` 实测**极简 vs 标准**的系统提示词差异（宿主已升到 **0.2.1-rc.3**）：极简 = 1 段 46 字符 + 3 工具（`complete:true` 压掉其余一切，可选上下文也抑制），标准 = 20 段/5347 字符 + 30 工具 + 6 类上下文；AGENTS.md / 技能目录 / 时间行走「消息通道」而非系统提示词。同时记录：安装路径改为 `D:\software\DeepseekHarness\desktop\resources\app.asar`（旧 `D:\software\DSH` 已删）、`dsh-tool-fs` 新增 read/readImage/write/edit 开关（旧结论「read_image 只能整组加」已过时）。日志 `logs/2026-10-29-preset-prompt-compare.md`。 |
 | 2026-10-29 | 新增 §12：新建**「助手标准模式」**（preset `standard-assistant`）= 标准模式 plugins 逐字复制 + 人设段换成 `You are a helpful software engineer assistant.`。关键机制：`ctx.systemPrompt.section()` 的**同名遮蔽** + 自定 `order`，把 `deployment:persona-prefix` 注册到 −2000 排到 `harness:identity`(−1000) 之前，成为系统提示词第一项（其余 16 段顺序与标准模式一致、30 工具一致）。本地插件行 `./x.mjs` 锚定 profile 目录，install 需复制插件且先放插件后写 patch。已实装 desktop profile，活宿主 6 行预设。需求目录 `mods/agent-preset-standard-assistant/`。 |
+| 2026-10-29 | 把新建的「助手标准模式」**改名为「标·准· 模式」**（preset id standard-assistant 不变，托管块标记去掉显示名）。同日用户在 desktop profile 装了通知插件 dsh-notify-me@1.17.0（另把 dsh-web-all/better-sidebar/dshmarket/dsh-meme 一并升级/新增）。 |

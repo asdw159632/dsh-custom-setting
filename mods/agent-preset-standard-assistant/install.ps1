@@ -1,7 +1,7 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-  把「助手标准模式」（agent preset id: standard-assistant）装进目标 dsh profile 的 cordis.patch.yml。
+  把「标·准· 模式」（agent preset id: standard-assistant）装进目标 dsh profile 的 cordis.patch.yml。
 
 .DESCRIPTION
   与同工作区 mods/agent-preset-custom/install.ps1 同一套做法：
@@ -31,8 +31,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$BEGIN_MARK = '# >>> agent-preset-standard-assistant (助手标准模式) managed block >>>'
-$END_MARK   = '# <<< agent-preset-standard-assistant (助手标准模式) managed block <<<'
+$BEGIN_MARK = '# >>> agent-preset-standard-assistant managed block >>>'
+$END_MARK   = '# <<< agent-preset-standard-assistant managed block <<<'
 $PLUGIN_NAME = 'persona-prefix-first.mjs'
 
 $HERE       = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -108,7 +108,7 @@ if ($isEmptyTemplate) {
     '# a top-level YAML array of loader patch entries (id-targeted config'
     '# overrides, disables, and insert lists; `!!js` expressions allowed).'
     '#'
-    '# 「助手标准模式」预设行由 mods/agent-preset-standard-assistant/install.ps1 托管（块标记见下）。'
+    '# 「标·准· 模式」预设行由 mods/agent-preset-standard-assistant/install.ps1 托管（块标记见下）。'
   )
   $newText = (($head + $block) -join "`n").TrimEnd("`n") + "`n"
 } else {
@@ -125,4 +125,4 @@ Write-PatchText -Path $PATCH_FILE -Text $newText -HasBom $current.HasBom -Eol $c
 Write-Host "install: 已写入 $PATCH_FILE"
 Write-Host "install: 已放置插件 $PROFILE_DIR\$PLUGIN_NAME"
 Write-Host "install: 备份 $BACKUP"
-Write-Host "install: 重启客户端（或等宿主热加载）后，新建任务 →「Agent 预设 → 自定义」里即可看到「助手标准模式」。"
+Write-Host "install: 重启客户端（或等宿主热加载）后，新建任务 →「Agent 预设 → 自定义」里即可看到「标·准· 模式」。"

@@ -1,7 +1,7 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-  校验「助手标准模式」：临时 DSH_HOME 里装一遍，实测工具清单 + 装配后的系统提示词。
+  校验「标·准· 模式」：临时 DSH_HOME 里装一遍，实测工具清单 + 装配后的系统提示词。
 
 .DESCRIPTION
   流程与 mods/agent-preset-custom/verify.ps1 一致：

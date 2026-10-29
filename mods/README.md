@@ -26,4 +26,4 @@ mods/
 | WSL 执行可行性 | `wsl-execution/` | 调研完成，四条路线见 memory §8 |
 | 桌面端接管 `dsh` 命令 | `dsh-command-desktop/` | 调研 + 只读校验完成，待用户在 GUI 点「管理 dsh 命令…」安装 |
 | 定制模式（preset `custom`） | `agent-preset-custom/` | 已实装 desktop profile（memory §10） |
-| 助手标准模式（preset `standard-assistant`） | `agent-preset-standard-assistant/` | 已实装 desktop profile（memory §12） |
+| 标·准· 模式（preset `standard-assistant`） | `agent-preset-standard-assistant/` | 已实装 desktop profile（memory §12） |

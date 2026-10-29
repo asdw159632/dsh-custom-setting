@@ -91,3 +91,14 @@ verify: PASSED
 * 上游标准模式升级后：按 `tmp/gen-standard-assistant-patch.mjs` 的思路重新生成（复制最新
   `standard.patch.yml` → 换 id/name/order → persona 行换成本插件行）。
 * 「同名遮蔽 + 自定 order」这套办法可复用到任何「想在某个模式里把某段提示词挪位置」的需求。
+
+## 8. 2026-10-29 改名
+
+用户要求把该模式的显示名改为 **「标·准· 模式」**（preset id standard-assistant 不变）：
+
+* standard-assistant.patch.yml 的 config.name → 标·准· 模式；同步 README / install.ps1 / uninstall.ps1 / verify.ps1 文案；
+* 托管块标记改为**不含显示名**的固定写法（避免以后再改名又要迁移）：
+  # >>> agent-preset-standard-assistant managed block >>> … <<<；
+* 已迁移真实 profile 里的旧标记并重跑 install.ps1，cordis.patch.yml 17286 B → 17274 B，
+  备份 cordis.patch.yml.bak-20261029-140849；verify 重跑 PASSED（30 工具、段序列不变），
+  活宿主 inspect 仍是 6 行预设（include:preset-standard-assistant 在列）。

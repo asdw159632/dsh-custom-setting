@@ -1,7 +1,7 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-  从目标 dsh profile 里摘掉「助手标准模式」：托管块 + 本地插件 persona-prefix-first.mjs。
+  从目标 dsh profile 里摘掉「标·准· 模式」：托管块 + 本地插件 persona-prefix-first.mjs。
 
 .DESCRIPTION
   先整份备份 cordis.patch.yml，再按块标记摘除；摘完只剩注释/空行时写回空模板 []。
@@ -20,8 +20,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$BEGIN_MARK  = '# >>> agent-preset-standard-assistant (助手标准模式) managed block >>>'
-$END_MARK    = '# <<< agent-preset-standard-assistant (助手标准模式) managed block <<<'
+$BEGIN_MARK  = '# >>> agent-preset-standard-assistant managed block >>>'
+$END_MARK    = '# <<< agent-preset-standard-assistant managed block <<<'
 $PLUGIN_NAME = 'persona-prefix-first.mjs'
 
 function Resolve-ProfileDir {
@@ -102,4 +102,4 @@ if (Test-Path -LiteralPath $pluginPath) {
   Write-Host "uninstall: 已删除本地插件 $pluginPath"
 }
 
-Write-Host "uninstall: 重启客户端后「助手标准模式」即消失。"
+Write-Host "uninstall: 重启客户端后「标·准· 模式」即消失。"
