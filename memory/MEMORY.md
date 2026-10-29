@@ -362,6 +362,32 @@
   `- insert:` 一行 `name: './probe-system-prompt.mjs'`，config 给 `presetIds` / `outDir` / `delayMs`）
   → 起临时实例 → 读 `out/<preset>.json`。`--dump-config` 只能看组合，看不到装配后的文本。
 
+## 12. 助手标准模式（agent preset `standard-assistant`，2026-10-29）
+
+> 需求目录 `mods/agent-preset-standard-assistant/`。
+> 一句话：**标准模式的 plugins 逐字复制，只把人设段换成「You are a helpful software engineer assistant.」，
+> 并用同名遮蔽把它注册到 order −2000，使其成为系统提示词第一项。**
+
+* 组成：`@deepseek-ai/dsh-web-app/presets/standard.patch.yml` 的 `plugins` 原样复制，去掉
+  `@deepseek-ai/dsh-persona` 行，换成本地插件 `persona-prefix-first.mjs`；其余行
+  （agent-instructions / time-context / tool-* / planning / compaction / delegation / skill /
+  goal / web / todo / present …）一字不改。显示名「助手标准模式」，order 6。
+* **机制（可复用）**：段顺序由段自己的 `order` 决定（`SECTION_ORDERS`：`harness:identity` = −1000、
+  内置 persona = 0、PLAN_POLICY = 500、tool 段 1000+）。`ctx.systemPrompt.section()` 支持
+  **同名遮蔽**（scoped 段覆盖同名 global 段，且带自己的 order）⇒ **想在标准模式里把某段排到最前/最后，
+  不必改上游包，在 preset 里挂个本地插件重注册同名段即可**（本模式就是这么把人设段排到身份段之前的）。
+* **本地插件在 preset 里的相对路径** `./x.mjs` 以「插入该预设行的 patch 文件所在目录」为锚点
+  （= profile 目录）⇒ install 必须把 `.mjs` 复制进 profile，且**先放插件再写 patch**
+  （桌面端热加载窗口里先写 patch 会解析不到插件）。
+* 实测（0.2.1-rc.3，干净 web 模板 profile；`verify.ps1` 退出码 0、无挂载告警）：
+  * 非空段 17 个：`deployment:persona-prefix`（**第一项**，新文案）→ `harness:identity`（第二项）→
+    `tool:pwsh/read/write/edit/glob/grep/jobs/web_search/web_fetch/goal/workflow/subagent_fork` →
+    `ui:deliverable-file-references` → `harness:source` → `app:web-surface`；
+  * 工具 **30 个**，与标准模式完全一致；运行时上下文与标准模式相同（不抑制）。
+* 实装：desktop profile patch 8935 B → 17275 B（原 200 行逐字保留，备份 `.bak-20261029-134215`），
+  插件 `persona-prefix-first.mjs` 落在 profile 目录；活宿主 inspect 安装后 **6 行**
+  （standard / ptc / minimal / cordis / custom / standard-assistant）⇒ 热加载成功。
+
 ---
 
 ## 变更记录
@@ -383,3 +409,4 @@
 | 2026-10-14 | 新增 §9：PowerShell 的 `dsh` = npm 全局 shim → 旧 CLI **0.1.0-rc.8**；桌面端自带 **0.2.0-rc.2** 的 `dsh.cmd` 且有官方接管机制（用户 PATH 首位 + `HKCU\Software\DeepSeekHarness\Command` 归属键），**从未安装**。入口在 preload 自绘标题栏的「应用」按钮 →「管理 dsh 命令…」。实测 PowerShell 解析**目录优先级 > 扩展名优先级**（只有 `dsh.cmd` 也能压过 `dsh.ps1`）。desktop profile 被 Electron 独占，CLI 不能 boot。沙箱内装不了（HKCU 拒写 / spawn EPERM）。需求目录 `mods/dsh-command-desktop/`（含只读校验 `verify.ps1`），日志 `logs/2026-10-14-dsh-command-desktop.md`。**待用户点 GUI 安装**。 |
 | 2026-10-15 | 新增 §10：把 WSL 侧的**「定制模式」**（preset `custom` = 极简 + `tool-fs` + `tool-ask-user`）复刻到 Windows 桌面客户端并实装进 desktop profile。同一份 patch 在 Windows 上工具名是 `pwsh`（Linux 是 `bash`）；实测 6 工具（模板 profile）/ 23 工具（真实 profile 副本，含第三方 task-board 的 17 个）。活宿主 inspect 安装后 5 行（多出 `include:preset-custom`）⇒ 热加载。需求目录 `mods/agent-preset-custom/`，日志 `logs/2026-10-15-agent-preset-custom-windows.md`。 |
 | 2026-10-29 | 新增 §11：用探针 `ctx.systemPrompt.assemble({scope})` 实测**极简 vs 标准**的系统提示词差异（宿主已升到 **0.2.1-rc.3**）：极简 = 1 段 46 字符 + 3 工具（`complete:true` 压掉其余一切，可选上下文也抑制），标准 = 20 段/5347 字符 + 30 工具 + 6 类上下文；AGENTS.md / 技能目录 / 时间行走「消息通道」而非系统提示词。同时记录：安装路径改为 `D:\software\DeepseekHarness\desktop\resources\app.asar`（旧 `D:\software\DSH` 已删）、`dsh-tool-fs` 新增 read/readImage/write/edit 开关（旧结论「read_image 只能整组加」已过时）。日志 `logs/2026-10-29-preset-prompt-compare.md`。 |
+| 2026-10-29 | 新增 §12：新建**「助手标准模式」**（preset `standard-assistant`）= 标准模式 plugins 逐字复制 + 人设段换成 `You are a helpful software engineer assistant.`。关键机制：`ctx.systemPrompt.section()` 的**同名遮蔽** + 自定 `order`，把 `deployment:persona-prefix` 注册到 −2000 排到 `harness:identity`(−1000) 之前，成为系统提示词第一项（其余 16 段顺序与标准模式一致、30 工具一致）。本地插件行 `./x.mjs` 锚定 profile 目录，install 需复制插件且先放插件后写 patch。已实装 desktop profile，活宿主 6 行预设。需求目录 `mods/agent-preset-standard-assistant/`。 |

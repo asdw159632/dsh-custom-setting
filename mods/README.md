@@ -20,4 +20,10 @@ mods/
 
 | 需求 | 目录 | 状态 |
 | --- | --- | --- |
-| （暂无） | — | — |
+| 侧栏工作区分活跃/沉默分组 | `active-workspaces/` | 补丁已写回 asar（事故后已恢复），有验收与补丁文档 |
+| 极简模式（preset `minimal`）调研 | `agent-preset-minimal/` | 调研完成，结论见 memory §7 |
+| 右侧栏编辑器选型 | `sidebar-editor/` | 选型完成（`dsh-better-sidebar@0.24.1`），待安装 |
+| WSL 执行可行性 | `wsl-execution/` | 调研完成，四条路线见 memory §8 |
+| 桌面端接管 `dsh` 命令 | `dsh-command-desktop/` | 调研 + 只读校验完成，待用户在 GUI 点「管理 dsh 命令…」安装 |
+| 定制模式（preset `custom`） | `agent-preset-custom/` | 已实装 desktop profile（memory §10） |
+| 助手标准模式（preset `standard-assistant`） | `agent-preset-standard-assistant/` | 已实装 desktop profile（memory §12） |
