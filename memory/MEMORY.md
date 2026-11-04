@@ -430,6 +430,30 @@
 
 ---
 
+## 14. GitHub 插件发布仓库（2026-11-04）
+
+> 日志 `logs/2026-11-04-github-publish.md`；发布脚本 `tmp/github-publish.ps1`（临时，不入库）。
+> 一句话：**插件发布到独立仓库，另有一个 `DSH-plugin` 集合仓库用 git submodule 挂各插件。**
+
+* **两个新仓库（public）**：
+  * 插件独立仓库：<https://github.com/asdw159632/dsh-panellist-collapse> —— 首个插件
+    `sidebar-panellist-collapse`（UI bundle，MIT）；
+  * 集合仓库：<https://github.com/asdw159632/DSH-plugin> —— 每个插件一个独立仓库，
+    以 **git submodule** 挂在 `plugins/<name>` 下（父仓库只记 gitlink）。
+* 本地副本：集合仓库 `D:\文档\DSH-plugin\DSH-plugin`（+ `plugins/dsh-panellist-collapse` 子模块工作副本）。
+* **发布流程（本机无 `gh` CLI，纯 git + REST API）**：
+  1. PAT 从 `git-credential-manager get` 取（40 位 classic，不落盘）；
+     `POST https://api.github.com/user/repos` 建仓库（`Bearer` 头）；
+  2. 插件目录复制出来 → `git init -b main` → commit →
+     `git -c http.sslBackend=openssl -c "http.extraHeader=Authorization: Basic <base64(user:pat)>" push -u origin main`；
+  3. 父仓库 `git init` → 写 README/LICENSE → commit →
+     `git submodule add https://github.com/<owner>/<plugin>.git plugins/<plugin>` → commit → push；
+  4. 用 `GET /repos/.../git/trees/main?recursive=1` 看 gitlink（mode 160000）核对 submodule 指针。
+* ⚠️ **本机已安装插件仍是 pnpm link 到 `DSH-custom/mods/sidebar-panellist-collapse`**，与发布仓库是两份；
+  改 GitHub 仓库不会影响已装插件，要换源需重新 `plugin_manager install_bundle` 指向新路径。
+* 新增插件的套路：建独立仓库并 push → 在集合仓库 `git submodule add <url> plugins/<name>` → 更新父 README 表格 → push。
+
+---
 ## 变更记录
 
 | 日期 | 内容 |
@@ -454,3 +478,4 @@
 | 2026-10-29 | 新增 §13：新建本地 UI 插件 **`@local/dsh-panellist-collapse`**（需求目录 `mods/sidebar-panellist-collapse/`）：在侧栏底部 `sidebar.footer.action` 加折叠按钮，折叠 `nav[role="navigation"]` 的「全局面板」列表，状态存 `localStorage`；实测折叠/展开/刷新持久均通过。同时记录本地 bundle 的开发-安装-验证路径与两个坑（宿主 CSS 覆盖按钮尺寸、`data-slot` 是逐项座位）。 |
 | 2026-10-29 | §13 修订（v2，按用户反馈）：折叠条从侧栏底部移到「面板列表与工作区之间」（该位置无官方 slot ⇒ DOM 注入 + `MutationObserver`）；折叠改为只收高度、**保留列表自身的 `margin-top`**——皮肤 `orca-link` 的动图舞台正是靠这条 margin 撑开的，用 `display:none` 会塌掉，现在**动图完全不动**；并修掉 `nav[role=navigation]` 选择器失效（`navigation` 是隐式角色）改用 `[class*="panelList"]`。 |
 | 2026-10-29 | §13 修订（v3，按用户反馈）：折叠从「整列收掉」改为「**保留前 `KEEP_ROWS` 行**」（默认 1 行 = 只留「插件」按钮，其余行隐藏；想只留少数几个按钮就调大这个常量），容器与 `margin-top` 仍不动。实测折叠后只显示「插件」行、动图不动、工作区紧接其下。 |
+| 2026-11-04 | 新增 §14：`sidebar-panellist-collapse` 发布为独立仓库 `asdw159632/dsh-panellist-collapse`（MIT），并新建集合仓库 `asdw159632/DSH-plugin`（git submodule 挂插件）；记录无 gh CLI 时「REST API 建仓 + extraHeader push + submodule」的发布流程，以及「已安装插件仍 link 到 DSH-custom/mods」这一注意点。日志 `logs/2026-11-04-github-publish.md`。 |

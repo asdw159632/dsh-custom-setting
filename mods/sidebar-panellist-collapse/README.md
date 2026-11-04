@@ -76,3 +76,9 @@ plugin_manager remove_bundle target="@local/dsh-panellist-collapse"
 | 2026-10-29 | 建立 v1：按钮挂侧栏底部扩展位，`display:none` 折叠列表。 |
 | 2026-10-29 | v2（按用户反馈）：折叠条移到「面板列表与工作区之间」；折叠改为只收高度、保留列表 `margin-top`，动图位置不再受影响；修掉 `nav[role=navigation]` 选择器失效、改用 `[class*="panelList"]`；加 `MutationObserver` 维持注入节点。实测折叠/展开/动图不动均通过。 |
 | 2026-10-29 | v3：折叠从「整列收掉」改为「**保留前 `KEEP_ROWS` 行**」——默认 1 行 = 只留「插件」按钮，调大常量即可只留少数几个按钮。实测折叠后只剩「插件」行、动图不动、工作区紧接其下。 |
+
+## 7. 发布仓库
+
+* 独立仓库：<https://github.com/asdw159632/dsh-panellist-collapse>（MIT）
+* 集合仓库：<https://github.com/asdw159632/DSH-plugin>，本插件以 **git submodule** 挂在 plugins/dsh-panellist-collapse
+* 本目录仍是本机开发副本（已安装插件是 pnpm link 到这里）；对外发布以独立仓库为准。
