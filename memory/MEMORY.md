@@ -452,6 +452,9 @@
 * ⚠️ **本机已安装插件仍是 pnpm link 到 `DSH-custom/mods/sidebar-panellist-collapse`**，与发布仓库是两份；
   改 GitHub 仓库不会影响已装插件，要换源需重新 `plugin_manager install_bundle` 指向新路径。
 * 新增插件的套路：建独立仓库并 push → 在集合仓库 `git submodule add <url> plugins/<name>` → 更新父 README 表格 → push。
+* ⚠️ **PS 5.1 的 `Invoke-RestMethod` 用字符串 Body 会按非 UTF-8 发送**：中文 description 建仓后显示成 `?????`
+  （README 不受影响，因为 git push 走字节流）。必须把 JSON 转成 UTF-8 字节数组传 Body，
+  并带 `ContentType 'application/json; charset=utf-8'`。两个仓库的 description 已按要求改成**英文**。
 
 ---
 ## 变更记录
