@@ -76,12 +76,37 @@ Write-Host "推送 $Branch -> $Remote （用户 $($cred.User)，token 长度 $($
 
 $basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("$($cred.User):$($cred.Token)"))
 
+function Get-GitProxy {
+    <#
+      本机 github.com 直连可能被网络阻断，但系统代理（IE 设置）可用；
+      git/curl 不读 IE 代理，所以这里把系统代理显式传给 git。
+      优先级：$env:DSH_GIT_PROXY > $env:HTTPS_PROXY > 系统 IE 代理。
+    #>
+    if ($env:DSH_GIT_PROXY) { return $env:DSH_GIT_PROXY }
+    if ($env:HTTPS_PROXY)   { return $env:HTTPS_PROXY }
+    if ($env:https_proxy)   { return $env:https_proxy }
+    try {
+        $ie = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -ErrorAction Stop
+        if ($ie.ProxyEnable -eq 1 -and $ie.ProxyServer) {
+            $server = "$($ie.ProxyServer)".Split(';')[0]      # 形如 127.0.0.1:7890
+            if ($server -match '^[a-zA-Z][a-zA-Z0-9+.-]*://') { return $server }
+            return "http://$server"
+        }
+    } catch { }
+    return $null
+}
+
 # http.sslBackend=openssl：本机 schannel 在沙箱下报 SEC_E_NO_CREDENTIALS
 $gitArgs = @(
     '-c', 'http.sslBackend=openssl',
     '-c', "http.extraHeader=Authorization: Basic $basic",
     'push'
 )
+$proxy = Get-GitProxy
+if ($proxy) {
+    Write-Host "使用代理：$proxy（系统 IE 代理 / 环境变量）"
+    $gitArgs = @('-c', 'http.sslBackend=openssl', '-c', "http.proxy=$proxy", '-c', "http.extraHeader=Authorization: Basic $basic", 'push')
+}
 if ($SetUpstream) { $gitArgs += '-u' }
 $gitArgs += @($Remote, $Branch)
 

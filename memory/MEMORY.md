@@ -466,6 +466,14 @@
   **兜底**：用 GitHub **Git Data API**（`POST /git/blobs` → `/git/trees`（`base_tree`）→ `/git/commits` →
   `PATCH /git/refs/heads/main`）直接更新远端文件，再用 `GET /contents/<path>?ref=main` 校验。
   代价：本地会留一个未推送 commit（内容一致），网络恢复后 `git -C <repo> fetch && git reset --hard origin/main` 对齐。
+* ⚠️ **github.com 直连会被网络阻断、但系统代理可用**（2026-11-04 实测）：直连时 `github.com:443` TCP 可连、
+  TLS 阶段被 reset/timeout；`api.github.com`、`codeload.github.com` 通常仍可达。本机 IE 代理为
+  `127.0.0.1:7890`（`HKCU:\...\Internet Settings`：`ProxyEnable=1`），**git/curl 不读 IE 代理**，
+  需显式 `git -c http.proxy=http://127.0.0.1:7890 ...`。`scripts/push.ps1` 已自动读取系统代理
+  （优先级：`$env:DSH_GIT_PROXY` > `$env:HTTPS_PROXY` > IE 代理），并同时脱敏 token 与 base64 头。
+* 网络恢复后对齐「API 写入的远端」与本地：`git -C <repo> fetch && git reset --hard origin/main`
+  （对齐前先 `git branch backup/<时间戳> HEAD` 留底）。本次两个仓库已对齐：`DSH-plugin@3ae4ed6`、
+  `dsh-custom-setting@c06a32a`，备份分支 `backup/pre-proxy-sync-20261104-1030`（仅本地）。
 * ⚠️ **生成 Markdown 反引号别写在双引号 here-string 里**：`"` 是转义符，`` \` `` 会变成反斜杠+字符，
   父仓库 README 表格一度出现 `\`dsh-panellist-collapse\`` 这种瑕疵。要写反引号用单引号 here-string（`@'...'@`）。
 

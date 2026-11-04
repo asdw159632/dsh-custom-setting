@@ -114,3 +114,21 @@ D:\文档\DSH-plugin\
 这次一次失败的 `git push` 把 `http.extraHeader=Authorization: Basic <base64(user:pat)>` 回显到了命令输出
 （脚本只脱敏了 token 原文，没脱敏 base64 组合）。该输出只在本机会话日志里，未进任何仓库；但建议抽空轮换一次 PAT。
 后续脚本已改为同时脱敏 token 与 basic 组合。
+
+## 7. 网络恢复后继续 push（走系统代理）
+
+`github.com:443` 直连仍被阻断（TCP 可连、TLS 被 reset/timeout），但发现 **系统 IE 代理是开着的**：
+`127.0.0.1:7890`（`HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings`，`ProxyEnable=1`）。
+**git/curl 不读 IE 代理**，所以之前所有 push 都直连失败；显式带上代理后立刻恢复：
+
+```
+git -c http.sslBackend=openssl -c http.proxy=http://127.0.0.1:7890 ...
+```
+
+处理结果：
+* `DSH-plugin`：`fetch` 拿到远端 `3ae4ed6`（API 写入的那次 README 修正），备份本地 commit
+  `backup/pre-proxy-sync-20261104-1030` 后 `reset --hard origin/main` → 本地=远端=**3ae4ed6**，工作树干净；
+* `dsh-custom-setting`：同样操作 → 本地=远端=**c06a32a**，干净；
+* 子模块核对：`plugins/dsh-git-plugin@8681bb2`、`plugins/dsh-panellist-collapse@d900b61`，与远端 gitlink 一致；
+* `scripts/push.ps1` 已改为**自动读取系统代理**（`DSH_GIT_PROXY` > `HTTPS_PROXY` > IE 代理）并同时脱敏
+  token 与 base64 Authorization 头；下次直接 `scripts\push.cmd` 即可。
