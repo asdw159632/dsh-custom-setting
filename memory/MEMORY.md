@@ -471,6 +471,13 @@
   `127.0.0.1:7890`（`HKCU:\...\Internet Settings`：`ProxyEnable=1`），**git/curl 不读 IE 代理**，
   需显式 `git -c http.proxy=http://127.0.0.1:7890 ...`。`scripts/push.ps1` 已自动读取系统代理
   （优先级：`$env:DSH_GIT_PROXY` > `$env:HTTPS_PROXY` > IE 代理），并同时脱敏 token 与 base64 头。
+* **PAT 轮换（2026-11-04 新增脚本）**：`scripts\rotate-pat.cmd`（`-CheckOnly` 只检查当前 token）。
+  凭据保存在 **Windows 凭据管理器**（GCM 目标 `git:https://github.com`，用户名 asdw159632；
+  系统级 `credential.helper=manager`，GCM 2.7.3）；`~/.git-credentials` 为空、无 `GITHUB_TOKEN` 环境变量。
+  轮换流程：GitHub 新建 classic PAT（至少 `repo`；本机现用 scopes = `gist, repo, workflow`）→
+  脚本隐藏输入 → `api.github.com` 校验账号/scopes → `git-credential-manager store` 覆盖 →
+  回读比对 SHA256 → `git ls-remote` 实测 → 到 <https://github.com/settings/tokens> 删除旧 token。
+  脚本**不打印 token、不写盘**；写入 token 用 stdin，不走命令行参数。
 * 网络恢复后对齐「API 写入的远端」与本地：`git -C <repo> fetch && git reset --hard origin/main`
   （对齐前先 `git branch backup/<时间戳> HEAD` 留底）。本次两个仓库已对齐：`DSH-plugin@3ae4ed6`、
   `dsh-custom-setting@c06a32a`，备份分支 `backup/pre-proxy-sync-20261104-1030`（仅本地）。
@@ -505,3 +512,4 @@
 | 2026-11-04 | 新增 §14：`sidebar-panellist-collapse` 发布为独立仓库 `asdw159632/dsh-panellist-collapse`（MIT），并新建集合仓库 `asdw159632/DSH-plugin`（git submodule 挂插件）；记录无 gh CLI 时「REST API 建仓 + extraHeader push + submodule」的发布流程，以及「已安装插件仍 link 到 DSH-custom/mods」这一注意点。日志 `logs/2026-11-04-github-publish.md`。 |
 | 2026-11-04 | 修正 GitHub 仓库 description：中文建仓时被 PS 5.1 `Invoke-RestMethod` 按非 UTF-8 发送，显示成 `?????`；改为 UTF-8 字节 Body 重设，并按用户要求把两个仓库 description 改成**英文**。`tmp/github-publish.ps1` 同步修好。 |
 | 2026-11-04 | §14 扩充：`dsh-git-plugin` 也发布为独立仓库（<https://github.com/asdw159632/dsh-git-plugin>，救回 9 个提交历史），并以第二个 submodule 挂进 `DSH-plugin`（父仓库 `18e0506`）；修 README 反引号转义 + 补条目（`github.com:443` 被阻断，改用 Git Data API 更新，远端 `3ae4ed6`）。记录「残缺 .git 手工复活」「GitHub 不通时的 API 兜底」「here-string 反引号坑」。 |
+| 2026-11-04 | 新增 `scripts\rotate-pat.cmd` / `rotate-pat.ps1`：PAT 轮换工具（隐藏输入 → API 校验 scopes → GCM 写入 → 回读 SHA256 比对 → `git ls-remote` 实测 → 提示删旧 token；不打印/不落盘）。记录凭据存放位置与轮换步骤（memory §14）。 |

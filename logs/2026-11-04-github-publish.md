@@ -132,3 +132,17 @@ git -c http.sslBackend=openssl -c http.proxy=http://127.0.0.1:7890 ...
 * 子模块核对：`plugins/dsh-git-plugin@8681bb2`、`plugins/dsh-panellist-collapse@d900b61`，与远端 gitlink 一致；
 * `scripts/push.ps1` 已改为**自动读取系统代理**（`DSH_GIT_PROXY` > `HTTPS_PROXY` > IE 代理）并同时脱敏
   token 与 base64 Authorization 头；下次直接 `scripts\push.cmd` 即可。
+
+## 8. PAT 轮换工具（安全收尾）
+
+因一次失败 push 把 base64 Authorization 回显进了本机会话日志，建议轮换 PAT。新增：
+
+* `scripts\rotate-pat.ps1` + `scripts\rotate-pat.cmd`（PS 5.1，BOM）；
+* `-CheckOnly`：只校验当前凭据（实测输出：账号 `asdw159632`、scopes `gist, repo, workflow`、代理 `http://127.0.0.1:7890`）；
+* 轮换流程（脚本内自动）：隐藏输入新 token → `api.github.com` 校验 → `git-credential-manager store`
+  写入 Windows 凭据管理器（stdin 传 token，不走 argv）→ 回读并比对 SHA256 → `git ls-remote` 实测 → 提示删除旧 token；
+* 安全约定：不打印 token、不写任何文件；`-TokenFile`（可选）读后即删。
+* 凭据存放：Windows 凭据管理器 `git:https://github.com`（用户 asdw159632），系统 `credential.helper=manager`；
+  `~/.git-credentials` 是空文件，`GITHUB_TOKEN` 环境变量未设置 —— 轮换只需更新凭据管理器一处。
+* 用户在 GitHub 侧的操作：Settings → Developer settings → Personal access tokens (classic) →
+  新建（勾 `repo`，按需 `gist`/`workflow`）→ 用脚本写入 → 验证 → **删除旧 token**（<https://github.com/settings/tokens>）。
