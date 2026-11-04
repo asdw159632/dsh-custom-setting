@@ -479,3 +479,4 @@
 | 2026-10-29 | §13 修订（v2，按用户反馈）：折叠条从侧栏底部移到「面板列表与工作区之间」（该位置无官方 slot ⇒ DOM 注入 + `MutationObserver`）；折叠改为只收高度、**保留列表自身的 `margin-top`**——皮肤 `orca-link` 的动图舞台正是靠这条 margin 撑开的，用 `display:none` 会塌掉，现在**动图完全不动**；并修掉 `nav[role=navigation]` 选择器失效（`navigation` 是隐式角色）改用 `[class*="panelList"]`。 |
 | 2026-10-29 | §13 修订（v3，按用户反馈）：折叠从「整列收掉」改为「**保留前 `KEEP_ROWS` 行**」（默认 1 行 = 只留「插件」按钮，其余行隐藏；想只留少数几个按钮就调大这个常量），容器与 `margin-top` 仍不动。实测折叠后只显示「插件」行、动图不动、工作区紧接其下。 |
 | 2026-11-04 | 新增 §14：`sidebar-panellist-collapse` 发布为独立仓库 `asdw159632/dsh-panellist-collapse`（MIT），并新建集合仓库 `asdw159632/DSH-plugin`（git submodule 挂插件）；记录无 gh CLI 时「REST API 建仓 + extraHeader push + submodule」的发布流程，以及「已安装插件仍 link 到 DSH-custom/mods」这一注意点。日志 `logs/2026-11-04-github-publish.md`。 |
+| 2026-11-04 | 修正 GitHub 仓库 description：中文建仓时被 PS 5.1 `Invoke-RestMethod` 按非 UTF-8 发送，显示成 `?????`；改为 UTF-8 字节 Body 重设，并按用户要求把两个仓库 description 改成**英文**。`tmp/github-publish.ps1` 同步修好。 |

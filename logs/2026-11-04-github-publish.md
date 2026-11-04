@@ -53,3 +53,17 @@ D:\文档\DSH-plugin\
   `git submodule add <repo-url> plugins/<name>` → 更新 README 表格 → commit/push。
 * 克隆集合仓库要带子模块：`git clone --recurse-submodules https://github.com/asdw159632/DSH-plugin.git`。
 * 两个仓库均为 public；如需私有可在 GitHub 设置里改，或告诉我用 API 改。
+
+## 5. 2026-11-04 修正：仓库 description 中文变 "?????"
+
+现象：两个仓库的 description 在 GitHub 上显示成 `?????`（README 内容正常，因为 git push 是字节流）。
+
+原因：**PowerShell 5.1 的 `Invoke-RestMethod` 用字符串 Body 时不会按 UTF-8 发送**（HttpWebRequest 默认按非 UTF-8 处理），
+建仓库时传的中文 description 被转成了 `?`。
+
+修正：
+* 用 `-Body ([Text.Encoding]::UTF8.GetBytes($json))` + `ContentType 'application/json; charset=utf-8'` 重新 PATCH；
+* 同时按用户要求把两个仓库的 description 改成**英文**：
+  * `dsh-panellist-collapse`：DSH UI plugin that collapses the left sidebar panel list: keep only the first N rows (default: just the Plugins entry) while leaving the skin artwork untouched.
+  * `DSH-plugin`：My DeepSeek Harness (DSH) plugin collection. Each plugin lives in its own repository and is mounted here as a git submodule.
+* `tmp/github-publish.ps1` 已同步改成 UTF-8 字节 Body（以后复用不再踩）。
