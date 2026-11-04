@@ -435,12 +435,14 @@
 > 日志 `logs/2026-11-04-github-publish.md`；发布脚本 `tmp/github-publish.ps1`（临时，不入库）。
 > 一句话：**插件发布到独立仓库，另有一个 `DSH-plugin` 集合仓库用 git submodule 挂各插件。**
 
-* **两个新仓库（public）**：
-  * 插件独立仓库：<https://github.com/asdw159632/dsh-panellist-collapse> —— 首个插件
-    `sidebar-panellist-collapse`（UI bundle，MIT）；
-  * 集合仓库：<https://github.com/asdw159632/DSH-plugin> —— 每个插件一个独立仓库，
-    以 **git submodule** 挂在 `plugins/<name>` 下（父仓库只记 gitlink）。
-* 本地副本：集合仓库 `D:\文档\DSH-plugin\DSH-plugin`（+ `plugins/dsh-panellist-collapse` 子模块工作副本）。
+* **三个仓库（public）**：
+  * 集合仓库：<https://github.com/asdw159632/DSH-plugin> —— 每个插件一个独立仓库，以 **git submodule**
+    挂在 `plugins/<name>` 下（父仓库只记 gitlink）；当前挂两个：`dsh-panellist-collapse`、`dsh-git-plugin`；
+  * <https://github.com/asdw159632/dsh-panellist-collapse> —— 侧栏面板折叠（UI bundle，MIT）；
+  * <https://github.com/asdw159632/dsh-git-plugin> —— Git 历史可视化 + add/commit/pull/push/merge；
+    源码原在 `D:\文档\DSH-plugin\git-plugin`，**9 个提交历史已保留**（其 `.git` 曾残缺，见下）。
+* 本地副本：集合仓库 `D:\文档\DSH-plugin\DSH-plugin`（+ `plugins/*` 两个子模块工作副本）；
+  `git-plugin` 仍在原位（桌面 profile 的 `node_modules` 是 junction 指过去，别动）。
 * **发布流程（本机无 `gh` CLI，纯 git + REST API）**：
   1. PAT 从 `git-credential-manager get` 取（40 位 classic，不落盘）；
      `POST https://api.github.com/user/repos` 建仓库（`Bearer` 头）；
@@ -454,7 +456,18 @@
 * 新增插件的套路：建独立仓库并 push → 在集合仓库 `git submodule add <url> plugins/<name>` → 更新父 README 表格 → push。
 * ⚠️ **PS 5.1 的 `Invoke-RestMethod` 用字符串 Body 会按非 UTF-8 发送**：中文 description 建仓后显示成 `?????`
   （README 不受影响，因为 git push 走字节流）。必须把 JSON 转成 UTF-8 字节数组传 Body，
-  并带 `ContentType 'application/json; charset=utf-8'`。两个仓库的 description 已按要求改成**英文**。
+  并带 `ContentType 'application/json; charset=utf-8'`。两个仓库的 description 已改成**英文**。
+* **救回残缺 `.git` 的办法（2026-11-04 实测）**：`D:\文档\DSH-plugin\git-plugin\.git` 只剩 `objects/` 与
+  `refs/heads/main`（缺 `HEAD`/`config`/`index`，`git` 报 not a git repository）。手工补两文件即可复活：
+  `HEAD` 写 `ref: refs/heads/main`；`config` 写最小 `[core] repositoryformatversion=0 filemode=false bare=false
+  logallrefupdates=true symlinks=false ignorecase=true`；然后 `git -C <dir> reset` 重建 index。历史/工作树完整。
+* ⚠️ **网络会抽风**：本次中途 `github.com:443` 与 `raw.githubusercontent.com` 被阻断（`api.github.com` 和
+  `codeload.github.com` 仍通），git push 全失败（`Recv failure / Connection was reset`）。
+  **兜底**：用 GitHub **Git Data API**（`POST /git/blobs` → `/git/trees`（`base_tree`）→ `/git/commits` →
+  `PATCH /git/refs/heads/main`）直接更新远端文件，再用 `GET /contents/<path>?ref=main` 校验。
+  代价：本地会留一个未推送 commit（内容一致），网络恢复后 `git -C <repo> fetch && git reset --hard origin/main` 对齐。
+* ⚠️ **生成 Markdown 反引号别写在双引号 here-string 里**：`"` 是转义符，`` \` `` 会变成反斜杠+字符，
+  父仓库 README 表格一度出现 `\`dsh-panellist-collapse\`` 这种瑕疵。要写反引号用单引号 here-string（`@'...'@`）。
 
 ---
 ## 变更记录
@@ -483,3 +496,4 @@
 | 2026-10-29 | §13 修订（v3，按用户反馈）：折叠从「整列收掉」改为「**保留前 `KEEP_ROWS` 行**」（默认 1 行 = 只留「插件」按钮，其余行隐藏；想只留少数几个按钮就调大这个常量），容器与 `margin-top` 仍不动。实测折叠后只显示「插件」行、动图不动、工作区紧接其下。 |
 | 2026-11-04 | 新增 §14：`sidebar-panellist-collapse` 发布为独立仓库 `asdw159632/dsh-panellist-collapse`（MIT），并新建集合仓库 `asdw159632/DSH-plugin`（git submodule 挂插件）；记录无 gh CLI 时「REST API 建仓 + extraHeader push + submodule」的发布流程，以及「已安装插件仍 link 到 DSH-custom/mods」这一注意点。日志 `logs/2026-11-04-github-publish.md`。 |
 | 2026-11-04 | 修正 GitHub 仓库 description：中文建仓时被 PS 5.1 `Invoke-RestMethod` 按非 UTF-8 发送，显示成 `?????`；改为 UTF-8 字节 Body 重设，并按用户要求把两个仓库 description 改成**英文**。`tmp/github-publish.ps1` 同步修好。 |
+| 2026-11-04 | §14 扩充：`dsh-git-plugin` 也发布为独立仓库（<https://github.com/asdw159632/dsh-git-plugin>，救回 9 个提交历史），并以第二个 submodule 挂进 `DSH-plugin`（父仓库 `18e0506`）；修 README 反引号转义 + 补条目（`github.com:443` 被阻断，改用 Git Data API 更新，远端 `3ae4ed6`）。记录「残缺 .git 手工复活」「GitHub 不通时的 API 兜底」「here-string 反引号坑」。 |

@@ -67,3 +67,50 @@ D:\文档\DSH-plugin\
   * `dsh-panellist-collapse`：DSH UI plugin that collapses the left sidebar panel list: keep only the first N rows (default: just the Plugins entry) while leaving the skin artwork untouched.
   * `DSH-plugin`：My DeepSeek Harness (DSH) plugin collection. Each plugin lives in its own repository and is mounted here as a git submodule.
 * `tmp/github-publish.ps1` 已同步改成 UTF-8 字节 Body（以后复用不再踩）。
+
+## 6. 追加发布 dsh-git-plugin（+ 网络故障与 API 兜底）
+
+用户要求把已有的 `dsh-git-plugin` 也挂进集合仓库。
+
+### 6.1 前置：救回残缺的 .git
+
+`D:\文档\DSH-plugin\git-plugin\.git` 只剩 `objects/` 和 `refs/heads/main`（缺 `HEAD`/`config`/`index`，
+`git` 直接报 "not a git repository"）。手工补：
+* `HEAD` = `ref: refs/heads/main`
+* `config` = 最小 `[core]` 段（repositoryformatversion=0 / filemode=false / bare=false / logallrefupdates=true）
+* `git -C <dir> reset` 重建 index
+
+复活后：**9 个提交历史完整**（HEAD `8681bb2`），工作树干净（15 个跟踪文件）。
+
+### 6.2 发布 + 挂子模块
+
+* 新建仓库 <https://github.com/asdw159632/dsh-git-plugin>（public，英文 description、topics）；
+* 本地直接 `git push -u origin main`（保留原历史），推送成功；
+* 集合仓库 `git submodule add https://github.com/asdw159632/dsh-git-plugin.git plugins/dsh-git-plugin`
+  → 提交 `18e0506` 并 push（此时 github.com 还通）。
+* 校验：`GET /repos/asdw159632/DSH-plugin/git/trees/main?recursive=1` 有两个 mode 160000 的 gitlink：
+  `plugins/dsh-git-plugin@8681bb2`、`plugins/dsh-panellist-collapse@d900b61`。
+
+### 6.3 网络故障 + Git Data API 兜底
+
+随后发现 **`github.com:443` 与 `raw.githubusercontent.com` 被阻断**（443 端口连接超时 / Connection reset），
+但 `api.github.com` 与 `codeload.github.com` 仍可达 → 所有 `git push` 失败。
+
+而集合仓库 README 还有两处要修：
+1. 表格里包名两侧误出现字面反斜杠（`\`dsh-panellist-collapse\``）——原因是生成 Markdown 时反引号写进了
+   **双引号 here-string**，`` \` `` 被当成转义；改用单引号 here-string 解决；
+2. 补上 `dsh-git-plugin` 行与目录树。
+
+本地提交 `66a7fae` 推不上去，于是用 **GitHub Git Data API** 直接改远端：
+`GET /git/ref/heads/main` → `POST /git/blobs`（base64 README）→ `POST /git/trees`（`base_tree` + README）
+→ `POST /git/commits` → `PATCH /git/refs/heads/main`。远端变为 `3ae4ed6`，
+用 `GET /contents/README.md?ref=main` 解码校验：含 git-plugin 表格行 + 两行 submodule 树 ✓。
+
+**遗留**：本地 `D:\文档\DSH-plugin\DSH-plugin` 的 `HEAD=66a7fae` 未推送（内容与远端 `3ae4ed6` 相同）；
+等 github.com 恢复后执行 `git fetch && git reset --hard origin/main` 即可对齐。
+
+### 6.4 安全提醒
+
+这次一次失败的 `git push` 把 `http.extraHeader=Authorization: Basic <base64(user:pat)>` 回显到了命令输出
+（脚本只脱敏了 token 原文，没脱敏 base64 组合）。该输出只在本机会话日志里，未进任何仓库；但建议抽空轮换一次 PAT。
+后续脚本已改为同时脱敏 token 与 basic 组合。
