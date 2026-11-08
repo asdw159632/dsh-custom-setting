@@ -485,6 +485,52 @@
   父仓库 README 表格一度出现 `\`dsh-panellist-collapse\`` 这种瑕疵。要写反引号用单引号 here-string（`@'...'@`）。
 
 ---
+
+## 15. 宿主升级到 0.2.2-rc.1 与「标·准· 模式」修复（2026-11-08）
+
+> 需求目录 `mods/agent-preset-standard-assistant/`，日志 `logs/2026-11-08-standard-assistant-fix.md`。
+> 一句话：**宿主 0.2.2-rc.1 的标准模式删掉了 `tool-subagent-list-agents` 行（子路径
+> `@deepseek-ai/dsh-tool-subagent-control/list-agents` 已不存在），预设里的死引用导致整个预设挂载失败；
+> 用新增的 `tools/gen-patch.mjs` 按新标准模式重新生成即可，校验改为与同实例标准模式动态对照。**
+
+* **宿主现状（2026-11-08）**：`D:\software\DeepseekHarness\desktop\resources\app.asar`，213202918 B，
+  自带 CLI `…\desktop\resources\runtime\cli\bin\dsh.cmd` = **0.2.2-rc.1**。`D:\software\DSH` 是旧记忆，以本节为准。
+  `tmp\asar-read.mjs`（只读：`list <prefix>` / `cat <path> [out]`）可随时取 asar 内文件。
+* **0.2.2-rc.1 标准模式相对 0.2.1-rc.3 的差异**（升级时最易踩的坑）：
+  * **删除** `- id: tool-subagent-list-agents`（`@deepseek-ai/dsh-tool-subagent-control/list-agents`）——
+    该子路径已从包 exports 移除；预设里留着它 = 整个预设 `never started`。
+  * `tool-subagent`：`modelSelectionSettings: true` → `modelSelection: true` + `modelDiscovery: true`
+    （新增 `list_subagent_models` 工具）。
+  * `tool-fs` 新增 `applyPatch: false`（`apply_patch` 工具）。
+  * `tool-plugin-manager` 的 `disabled` 改为 `!!js "!ctx.get('profileContext')"`。
+  * persona 文案变成 `You are a coding agent powered by the {{model}} model.`（本模式不用它）。
+  * 非空段 17 → 18；干净模板下工具 30 → 33。
+* **修复方式**：`mods/agent-preset-standard-assistant/tools/gen-patch.mjs <standard.patch.yml>` 从上游
+  逐字复制 `plugins`，只换 id/name/order 和 persona 行；**上游一升级就重跑它**，不要手工对照。
+* **校验（0.2.2 起）**：`verify.ps1` 不写死段名/工具名，而是在同一临时实例里同时探测 `standard` 与
+  `standard-assistant`，断言：无挂载告警；工具清单完全一致；第一项 `deployment:persona-prefix`
+  （本模式文案、只出现一次）；第二项 `harness:identity`；其余段 = 标准模式去掉自己 persona 段后的序列。
+  新增 `tools/verify-real-profile.ps1`：复制真实 desktop profile（node_modules 走 junction，profile 名改
+  `sarealverify`）起临时实例复验完整 bundle 栈。两段均 PASSED（33 工具）。
+* **真实 profile 里的历史遗留行**：`- id: web-ui-model-capabilities`（对应条目已被
+  `@linxin666/dsh-web-all@0.4.16` 删除）。**活宿主能容忍**（inspect 查不到该 entry 也不报错），
+  但 `dsh --profile <副本> --dump-config` 会直接 `patch: entry "web-ui-model-capabilities" not found` 失败。
+  已从真实 profile 删除该 2 行（备份 `.bak-20261108-092018-pre-stale-clean`）。
+  **以后插件升级后若 CLI --dump-config 报 patch entry not found，先怀疑这类「bundle 删了行、profile 还 patch 它」的残留。**
+* **实装记录**：desktop profile patch 重写为 17777 B（备份 `.bak-20261108-091448`），活宿主仍 6 行预设；
+  真实副本端到端 PASSED。热加载能否应用新定义没法在线断言；若新会话仍报旧错，重启一次客户端。
+* **命令行工具换 WSL 的讨论**：见 `mods/agent-preset-standard-assistant/WSL-VS-POWERSHELL.md`。要点：
+  * 模式里的 `pwsh` 是**一次性**工具（`dsh-tool-pwsh` + 宿主 `ctx.shell`=`pwsh-sandbox`），preset 改不了执行器；
+    Windows 沙箱会包裹它，受限会话里 `wsl.exe` 被拒（§8 的 A/B）。
+  * 本机**无 PowerShell 7**，`pwsh` 实际是 Windows PowerShell 5.1。
+  * 推荐路线 = 本地插件注册 WSL `bash` 工具（`ctx.subprocess.spawn(['wsl.exe','--cd',<win cwd>,'--','bash','-lc',cmd])`）；
+    `dsh-subprocess-local` 代码里**没有 confine**（已核对），受限会话也能跑，代价是 **Windows 文件沙箱对 WSL 命令失效**。
+  * 不推荐官方持久 bash + `shellPath: wsl.exe`：会被 `confine` 拒（只有完全访问能用）；就绪标记依赖
+    `PS1`/`PROMPT_COMMAND`，而 WSL 默认不继承 Windows 环境变量（实测 `$env:FOO` 过去为空，须 `WSLENV`），
+    默认参数 `--noprofile --norc -i` 传给 `wsl.exe` 也不合法。
+  * 长期方案可选 `web-ui-ssh` 把 WSL 当 Linux 远主机（profile 里已 `disabled: false`）。
+
+---
 ## 变更记录
 
 | 日期 | 内容 |
@@ -513,3 +559,4 @@
 | 2026-11-04 | 修正 GitHub 仓库 description：中文建仓时被 PS 5.1 `Invoke-RestMethod` 按非 UTF-8 发送，显示成 `?????`；改为 UTF-8 字节 Body 重设，并按用户要求把两个仓库 description 改成**英文**。`tmp/github-publish.ps1` 同步修好。 |
 | 2026-11-04 | §14 扩充：`dsh-git-plugin` 也发布为独立仓库（<https://github.com/asdw159632/dsh-git-plugin>，救回 9 个提交历史），并以第二个 submodule 挂进 `DSH-plugin`（父仓库 `18e0506`）；修 README 反引号转义 + 补条目（`github.com:443` 被阻断，改用 Git Data API 更新，远端 `3ae4ed6`）。记录「残缺 .git 手工复活」「GitHub 不通时的 API 兜底」「here-string 反引号坑」。 |
 | 2026-11-04 | 新增 `scripts\rotate-pat.cmd` / `rotate-pat.ps1`：PAT 轮换工具（隐藏输入 → API 校验 scopes → GCM 写入 → 回读 SHA256 比对 → `git ls-remote` 实测 → 提示删旧 token；不打印/不落盘）。记录凭据存放位置与轮换步骤（memory §14）。 |
+| 2026-11-08 | 新增 §15：宿主升到 **0.2.2-rc.1**；「标·准· 模式」因上游删除 `tool-subagent-list-agents` 行而死引用挂载失败，改用 `tools/gen-patch.mjs` 重新生成 + 动态对照校验（干净模板与真实 profile 副本均 PASSED，33 工具）；清掉真实 profile 里 `web-ui-model-capabilities` 遗留 patch 行。附 `WSL-VS-POWERSHELL.md`：命令行工具换 WSL 的四条路线与推荐（本地插件走 `ctx.subprocess` 注册 WSL `bash`）。日志 `logs/2026-11-08-standard-assistant-fix.md`。 |
